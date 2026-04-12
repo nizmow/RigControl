@@ -11,6 +11,13 @@ import (
 	"rigcontrol/internal/machine"
 )
 
+type profileEditor struct {
+	window     fyne.Window
+	form       *profileForm
+	errorLabel *widget.Label
+	onSave     func(machine.Profile) error
+}
+
 type profileForm struct {
 	name         *widget.Entry
 	description  *widget.Entry
@@ -28,61 +35,66 @@ type profileForm struct {
 }
 
 func showProfileEditor(window fyne.Window, profile machine.Profile, onSave func(machine.Profile) error) {
-	form := newProfileForm(profile)
+	editor := newProfileEditor(profile, onSave)
+	editor.show()
+}
+
+func newProfileEditor(profile machine.Profile, onSave func(machine.Profile) error) *profileEditor {
 	errorLabel := widget.NewLabel("")
 	errorLabel.Wrapping = fyne.TextWrapWord
 
-	saveButton := widget.NewButton("Save", nil)
-	cancelButton := widget.NewButton("Cancel", nil)
+	editor := &profileEditor{
+		window:     fyne.CurrentApp().NewWindow("Edit Machine"),
+		form:       newProfileForm(profile),
+		errorLabel: errorLabel,
+		onSave:     onSave,
+	}
 
-	editorWindow := fyne.CurrentApp().NewWindow("Edit Machine")
-	editorWindow.Resize(fyne.NewSize(620, 760))
+	editor.window.Resize(fyne.NewSize(620, 760))
+	editor.window.SetContent(container.NewPadded(editor.content()))
+	editor.window.CenterOnScreen()
 
-	content := container.NewBorder(
+	return editor
+}
+
+func (e *profileEditor) content() fyne.CanvasObject {
+	saveButton := widget.NewButton("Save", e.handleSave)
+	cancelButton := widget.NewButton("Cancel", func() {
+		e.window.Close()
+	})
+
+	return container.NewBorder(
 		nil,
 		container.NewHBox(cancelButton, saveButton),
 		nil,
 		nil,
 		container.NewVBox(
-			errorLabel,
-			widget.NewForm(
-				widget.NewFormItem("Name", form.name),
-				widget.NewFormItem("Description", form.description),
-				widget.NewFormItem("CPU Core", form.cpuCore),
-				widget.NewFormItem("CPU Type", form.cpuType),
-				widget.NewFormItem("Cycles", form.cycles),
-				widget.NewFormItem("Video", form.videoMachine),
-				widget.NewFormItem("Memory (MB)", form.memoryMB),
-				widget.NewFormItem("Sound", form.soundBlaster),
-				widget.NewFormItem("Joystick", form.joystickType),
-			),
-			form.gus,
-			form.xms,
-			form.ems,
-			form.umb,
+			e.errorLabel,
+			e.form.widget(),
+			e.form.gus,
+			e.form.xms,
+			e.form.ems,
+			e.form.umb,
 		),
 	)
+}
 
-	editorWindow.SetContent(container.NewPadded(content))
-	editorWindow.CenterOnScreen()
-
-	cancelButton.OnTapped = func() {
-		editorWindow.Close()
+func (e *profileEditor) handleSave() {
+	profile, err := e.form.profile()
+	if err != nil {
+		e.errorLabel.SetText(err.Error())
+		return
 	}
-	saveButton.OnTapped = func() {
-		updated, err := form.profile()
-		if err != nil {
-			errorLabel.SetText(err.Error())
-			return
-		}
-		if err := onSave(updated); err != nil {
-			errorLabel.SetText(err.Error())
-			return
-		}
-		editorWindow.Close()
+	if err := e.onSave(profile); err != nil {
+		e.errorLabel.SetText(err.Error())
+		return
 	}
 
-	editorWindow.Show()
+	e.window.Close()
+}
+
+func (e *profileEditor) show() {
+	e.window.Show()
 }
 
 func newProfileForm(profile machine.Profile) *profileForm {
@@ -105,21 +117,38 @@ func newProfileForm(profile machine.Profile) *profileForm {
 		umb:          widget.NewCheck("UMB", nil),
 	}
 
-	form.name.SetText(profile.Name)
-	form.description.SetText(profile.Description)
-	form.cpuCore.SetSelected(profile.CPUCore)
-	form.cpuType.SetSelected(profile.CPUType)
-	form.cycles.SetText(profile.Cycles)
-	form.videoMachine.SetSelected(profile.Machine)
-	form.memoryMB.SetText(fmt.Sprintf("%d", profile.MemoryMB))
-	form.soundBlaster.SetSelected(profile.SoundBlaster)
-	form.joystickType.SetSelected(profile.JoystickType)
-	form.gus.SetChecked(profile.GUS)
-	form.xms.SetChecked(profile.XMS)
-	form.ems.SetChecked(profile.EMS)
-	form.umb.SetChecked(profile.UMB)
-
+	form.setProfile(profile)
 	return form
+}
+
+func (f *profileForm) widget() fyne.CanvasObject {
+	return widget.NewForm(
+		widget.NewFormItem("Name", f.name),
+		widget.NewFormItem("Description", f.description),
+		widget.NewFormItem("CPU Core", f.cpuCore),
+		widget.NewFormItem("CPU Type", f.cpuType),
+		widget.NewFormItem("Cycles", f.cycles),
+		widget.NewFormItem("Video", f.videoMachine),
+		widget.NewFormItem("Memory (MB)", f.memoryMB),
+		widget.NewFormItem("Sound", f.soundBlaster),
+		widget.NewFormItem("Joystick", f.joystickType),
+	)
+}
+
+func (f *profileForm) setProfile(profile machine.Profile) {
+	f.name.SetText(profile.Name)
+	f.description.SetText(profile.Description)
+	f.cpuCore.SetSelected(profile.CPUCore)
+	f.cpuType.SetSelected(profile.CPUType)
+	f.cycles.SetText(profile.Cycles)
+	f.videoMachine.SetSelected(profile.Machine)
+	f.memoryMB.SetText(fmt.Sprintf("%d", profile.MemoryMB))
+	f.soundBlaster.SetSelected(profile.SoundBlaster)
+	f.joystickType.SetSelected(profile.JoystickType)
+	f.gus.SetChecked(profile.GUS)
+	f.xms.SetChecked(profile.XMS)
+	f.ems.SetChecked(profile.EMS)
+	f.umb.SetChecked(profile.UMB)
 }
 
 func (f *profileForm) profile() (machine.Profile, error) {

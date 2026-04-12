@@ -1,6 +1,7 @@
 package machine
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,5 +121,88 @@ func TestSaveProfilesRejectsInvalidProfiles(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "profile name is required") {
 		t.Fatalf("SaveProfiles() error = %v, want validation message", err)
+	}
+}
+
+func TestSaveProfilesThenLoadProfilesRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	store := Store{Path: path}
+	want := []Profile{
+		{
+			Name:         "Round Trip Machine",
+			Description:  "Stored and loaded",
+			CPUCore:      "dynamic",
+			CPUType:      "pentium",
+			Cycles:       "50000",
+			Machine:      "svga_s3",
+			MemoryMB:     32,
+			SoundBlaster: "sb16",
+			GUS:          true,
+			JoystickType: "auto",
+			XMS:          true,
+			EMS:          true,
+			UMB:          false,
+		},
+	}
+
+	if err := store.SaveProfiles(want); err != nil {
+		t.Fatalf("SaveProfiles() error = %v", err)
+	}
+
+	got, err := store.LoadProfiles()
+	if err != nil {
+		t.Fatalf("LoadProfiles() error = %v", err)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("LoadProfiles() returned %d profiles, want %d", len(got), len(want))
+	}
+	if got[0] != want[0] {
+		t.Fatalf("LoadProfiles() profile = %#v, want %#v", got[0], want[0])
+	}
+}
+
+func TestSaveProfilesCreatesParentDirectories(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "config", "machines.json")
+	store := Store{Path: path}
+
+	err := store.SaveProfiles([]Profile{
+		{
+			Name:         "Nested Save",
+			CPUCore:      "auto",
+			CPUType:      "486",
+			Cycles:       "25000",
+			Machine:      "svga_s3",
+			MemoryMB:     16,
+			SoundBlaster: "sb16",
+			JoystickType: "auto",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveProfiles() error = %v", err)
+	}
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("saved file missing at %s: %v", path, err)
+	}
+}
+
+func TestLoadProfilesRejectsEmptyProfilesList(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	payload, err := json.Marshal(fileData{Profiles: []Profile{}})
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	store := Store{Path: path}
+	_, err = store.LoadProfiles()
+	if err == nil {
+		t.Fatal("LoadProfiles() error = nil, want empty profile error")
+	}
+	if !strings.Contains(err.Error(), "contains no profiles") {
+		t.Fatalf("LoadProfiles() error = %v, want empty profile message", err)
 	}
 }

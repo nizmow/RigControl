@@ -43,11 +43,9 @@ func (s Store) LoadProfiles() ([]Profile, error) {
 		return nil, fmt.Errorf("machine config %s contains no profiles", s.Path)
 	}
 
-	profiles := cloneProfiles(data.Profiles)
-	for i, profile := range profiles {
-		if err := ValidateProfile(profile); err != nil {
-			return nil, fmt.Errorf("machine config %s profile %d (%q): %w", s.Path, i, profile.Name, err)
-		}
+	profiles, err := validatedProfiles(data.Profiles)
+	if err != nil {
+		return nil, wrapProfileValidationError("machine config "+s.Path, err)
 	}
 
 	return profiles, nil
@@ -58,11 +56,9 @@ func (s Store) SaveProfiles(profiles []Profile) error {
 		return fmt.Errorf("no machine profiles to save")
 	}
 
-	cloned := cloneProfiles(profiles)
-	for i, profile := range cloned {
-		if err := ValidateProfile(profile); err != nil {
-			return fmt.Errorf("save machine config %s profile %d (%q): %w", s.Path, i, profile.Name, err)
-		}
+	cloned, err := validatedProfiles(profiles)
+	if err != nil {
+		return wrapProfileValidationError("save machine config "+s.Path, err)
 	}
 
 	payload, err := json.MarshalIndent(fileData{Profiles: cloned}, "", "  ")
@@ -82,4 +78,37 @@ func (s Store) SaveProfiles(profiles []Profile) error {
 
 func cloneProfiles(profiles []Profile) []Profile {
 	return append([]Profile(nil), profiles...)
+}
+
+func validatedProfiles(profiles []Profile) ([]Profile, error) {
+	cloned := cloneProfiles(profiles)
+	for i, profile := range cloned {
+		if err := ValidateProfile(profile); err != nil {
+			return nil, profileError{
+				Index: i,
+				Name:  profile.Name,
+				Err:   err,
+			}
+		}
+	}
+
+	return cloned, nil
+}
+
+type profileError struct {
+	Index int
+	Name  string
+	Err   error
+}
+
+func (e profileError) Error() string {
+	return fmt.Sprintf("profile %d (%q): %v", e.Index, e.Name, e.Err)
+}
+
+func (e profileError) Unwrap() error {
+	return e.Err
+}
+
+func wrapProfileValidationError(context string, err error) error {
+	return fmt.Errorf("%s %w", context, err)
 }

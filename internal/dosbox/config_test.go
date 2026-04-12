@@ -49,3 +49,38 @@ func TestRenderIncludesExpectedSectionsAndValues(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderIncludesDisabledAndFalseValues(t *testing.T) {
+	profile := machine.Profile{
+		Name:         "Minimal Machine",
+		CPUCore:      "normal",
+		CPUType:      "386",
+		Cycles:       "1200",
+		Machine:      "ega",
+		MemoryMB:     2,
+		SoundBlaster: "sb1",
+		GUS:          false,
+		JoystickType: "disabled",
+		XMS:          false,
+		EMS:          true,
+		UMB:          false,
+	}
+
+	rendered := Render(profile)
+
+	for _, want := range []string{
+		"core=normal",
+		"cputype=386",
+		"cpu_cycles=1200",
+		"gus=false",
+		"joysticktype=disabled",
+		"xms=false",
+		"ems=true",
+		"umb=false",
+		"sbmixer=true",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered config missing %q:\n%s", want, rendered)
+		}
+	}
+}

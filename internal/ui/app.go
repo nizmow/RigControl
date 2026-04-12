@@ -77,99 +77,17 @@ func newAppUI(window fyne.Window, profiles []machine.Profile, saveProfiles func(
 
 func (ui *appUI) content() fyne.CanvasObject {
 	addButton := widget.NewButton("Add Machine", func() {
-		showProfileEditor(ui.window, newMachineProfile(), func(created machine.Profile) error {
-			nextProfiles := append(append([]machine.Profile(nil), ui.profiles...), created)
-
-			if ui.saveProfiles != nil {
-				if err := ui.saveProfiles(nextProfiles); err != nil {
-					return err
-				}
-			}
-
-			ui.profiles = nextProfiles
-			ui.list.Refresh()
-			ui.list.Select(len(ui.profiles) - 1)
-			return nil
-		})
+		showProfileEditor(ui.window, machine.NewProfile(), ui.addProfile)
 	})
 
 	editButton := widget.NewButton("Edit Machine", func() {
-		showProfileEditor(ui.window, ui.selectedProfile(), func(updated machine.Profile) error {
-			nextProfiles := append([]machine.Profile(nil), ui.profiles...)
-			nextProfiles[ui.selectedIndex] = updated
-
-			if ui.saveProfiles != nil {
-				if err := ui.saveProfiles(nextProfiles); err != nil {
-					return err
-				}
-			}
-
-			ui.profiles = nextProfiles
-			ui.list.Refresh()
-			ui.selectProfile(ui.selectedIndex)
-			return nil
-		})
+		showProfileEditor(ui.window, ui.selectedProfile(), ui.updateSelectedProfile)
 	})
 
-	launchButton := widget.NewButton("Launch DOSBox", func() {
-		profile := ui.selectedProfile()
-		if err := machine.ValidateProfile(profile); err != nil {
-			dialog.ShowError(err, ui.window)
-			return
-		}
+	launchButton := widget.NewButton("Launch DOSBox", ui.launchSelectedProfile)
 
-		configPath, err := writeTempConfig(profile)
-		if err != nil {
-			dialog.ShowError(err, ui.window)
-			return
-		}
-
-		if err := launchDOSBox(configPath); err != nil {
-			dialog.ShowError(err, ui.window)
-			return
-		}
-
-		dialog.ShowInformation("DOSBox Started", "Launched DOSBox Staging with "+filepath.Base(configPath), ui.window)
-	})
-
-	leftPane := container.NewBorder(
-		widget.NewLabel("Machine Types"),
-		nil,
-		nil,
-		nil,
-		ui.list,
-	)
-
-	summaryPane := container.NewVBox(
-		ui.nameLabel,
-		ui.descriptionLabel,
-		widget.NewSeparator(),
-		widget.NewLabel("Configuration Summary"),
-		ui.summaryLabel,
-	)
-
-	actions := container.NewHBox(addButton, editButton, launchButton)
-
-	rightPane := container.NewBorder(
-		nil,
-		actions,
-		nil,
-		nil,
-		func() *container.Split {
-			split := container.NewVSplit(
-				container.NewPadded(summaryPane),
-				container.NewBorder(
-					widget.NewLabel("DOSBox Config Preview"),
-					nil,
-					nil,
-					nil,
-					ui.preview,
-				),
-			)
-			split.SetOffset(0.42)
-			return split
-		}(),
-	)
+	leftPane := ui.buildLeftPane()
+	rightPane := ui.buildRightPane(addButton, editButton, launchButton)
 
 	split := container.NewHSplit(container.NewPadded(leftPane), container.NewPadded(rightPane))
 	split.SetOffset(0.28)
@@ -181,34 +99,109 @@ func (ui *appUI) selectedProfile() machine.Profile {
 	return ui.profiles[ui.selectedIndex]
 }
 
-func (ui *appUI) selectProfile(id widget.ListItemID) {
-	if id < 0 || id >= len(ui.profiles) {
+func (ui *appUI) addProfile(profile machine.Profile) error {
+	nextProfiles := append(append([]machine.Profile(nil), ui.profiles...), profile)
+	if err := ui.persistProfiles(nextProfiles); err != nil {
+		return err
+	}
+
+	ui.profiles = nextProfiles
+	ui.list.Refresh()
+	ui.list.Select(len(ui.profiles) - 1)
+	return nil
+}
+
+func (ui *appUI) updateSelectedProfile(profile machine.Profile) error {
+	nextProfiles := append([]machine.Profile(nil), ui.profiles...)
+	nextProfiles[ui.selectedIndex] = profile
+	if err := ui.persistProfiles(nextProfiles); err != nil {
+		return err
+	}
+
+	ui.profiles = nextProfiles
+	ui.list.Refresh()
+	ui.refreshSelectedProfile()
+	return nil
+}
+
+func (ui *appUI) persistProfiles(profiles []machine.Profile) error {
+	if ui.saveProfiles == nil {
+		return nil
+	}
+	return ui.saveProfiles(profiles)
+}
+
+func (ui *appUI) launchSelectedProfile() {
+	profile := ui.selectedProfile()
+	if err := machine.ValidateProfile(profile); err != nil {
+		dialog.ShowError(err, ui.window)
 		return
 	}
 
-	ui.selectedIndex = id
-	profile := ui.selectedProfile()
+	configPath, err := writeTempConfig(profile)
+	if err != nil {
+		dialog.ShowError(err, ui.window)
+		return
+	}
 
+	if err := launchDOSBox(configPath); err != nil {
+		dialog.ShowError(err, ui.window)
+		return
+	}
+
+	dialog.ShowInformation("DOSBox Started", "Launched DOSBox Staging with "+filepath.Base(configPath), ui.window)
+}
+
+func (ui *appUI) buildLeftPane() fyne.CanvasObject {
+	return container.NewBorder(
+		widget.NewLabel("Machine Types"),
+		nil,
+		nil,
+		nil,
+		ui.list,
+	)
+}
+
+func (ui *appUI) buildRightPane(objects ...fyne.CanvasObject) fyne.CanvasObject {
+	actions := container.NewHBox(objects...)
+	split := container.NewVSplit(
+		container.NewPadded(ui.buildSummaryPane()),
+		container.NewBorder(
+			widget.NewLabel("DOSBox Config Preview"),
+			nil,
+			nil,
+			nil,
+			ui.preview,
+		),
+	)
+	split.SetOffset(0.42)
+
+	return container.NewBorder(nil, actions, nil, nil, split)
+}
+
+func (ui *appUI) buildSummaryPane() fyne.CanvasObject {
+	return container.NewVBox(
+		ui.nameLabel,
+		ui.descriptionLabel,
+		widget.NewSeparator(),
+		widget.NewLabel("Configuration Summary"),
+		ui.summaryLabel,
+	)
+}
+
+func (ui *appUI) refreshSelectedProfile() {
+	profile := ui.selectedProfile()
 	ui.nameLabel.SetText(profile.Name)
 	ui.descriptionLabel.SetText(profile.Description)
 	ui.summaryLabel.SetText(profileSummary(profile))
 	ui.preview.SetText(dosbox.Render(profile))
 }
 
-func newMachineProfile() machine.Profile {
-	return machine.Profile{
-		Name:         "New Machine",
-		Description:  "",
-		CPUCore:      "auto",
-		CPUType:      "486",
-		Cycles:       "25000",
-		Machine:      "svga_s3",
-		MemoryMB:     16,
-		SoundBlaster: "sb16",
-		JoystickType: "auto",
-		GUS:          false,
-		XMS:          true,
-		EMS:          true,
-		UMB:          true,
+func (ui *appUI) selectProfile(id widget.ListItemID) {
+	if id < 0 || id >= len(ui.profiles) {
+		return
 	}
+
+	ui.selectedIndex = id
+	ui.refreshSelectedProfile()
 }
