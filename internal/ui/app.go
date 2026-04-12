@@ -16,6 +16,7 @@ import (
 
 type appUI struct {
 	window           fyne.Window
+	saveProfiles     func([]machine.Profile) error
 	profiles         []machine.Profile
 	selectedIndex    int
 	list             *widget.List
@@ -25,7 +26,7 @@ type appUI struct {
 	preview          *widget.Entry
 }
 
-func RunWithProfiles(profiles []machine.Profile) error {
+func RunWithProfiles(profiles []machine.Profile, saveProfiles func([]machine.Profile) error) error {
 	if len(profiles) == 0 {
 		return errors.New("no machine profiles available")
 	}
@@ -34,7 +35,7 @@ func RunWithProfiles(profiles []machine.Profile) error {
 	window := fyneApp.NewWindow("RigControl")
 	window.Resize(fyne.NewSize(1080, 720))
 
-	ui := newAppUI(window, profiles)
+	ui := newAppUI(window, profiles, saveProfiles)
 	window.SetContent(ui.content())
 	ui.list.Select(0)
 	window.ShowAndRun()
@@ -42,9 +43,10 @@ func RunWithProfiles(profiles []machine.Profile) error {
 	return nil
 }
 
-func newAppUI(window fyne.Window, profiles []machine.Profile) *appUI {
+func newAppUI(window fyne.Window, profiles []machine.Profile, saveProfiles func([]machine.Profile) error) *appUI {
 	ui := &appUI{
 		window:           window,
+		saveProfiles:     saveProfiles,
 		profiles:         profiles,
 		selectedIndex:    0,
 		nameLabel:        widget.NewLabel(""),
@@ -74,11 +76,38 @@ func newAppUI(window fyne.Window, profiles []machine.Profile) *appUI {
 }
 
 func (ui *appUI) content() fyne.CanvasObject {
+	addButton := widget.NewButton("Add Machine", func() {
+		showProfileEditor(ui.window, newMachineProfile(), func(created machine.Profile) error {
+			nextProfiles := append(append([]machine.Profile(nil), ui.profiles...), created)
+
+			if ui.saveProfiles != nil {
+				if err := ui.saveProfiles(nextProfiles); err != nil {
+					return err
+				}
+			}
+
+			ui.profiles = nextProfiles
+			ui.list.Refresh()
+			ui.list.Select(len(ui.profiles) - 1)
+			return nil
+		})
+	})
+
 	editButton := widget.NewButton("Edit Machine", func() {
-		showProfileEditor(ui.window, ui.selectedProfile(), func(updated machine.Profile) {
-			ui.profiles[ui.selectedIndex] = updated
+		showProfileEditor(ui.window, ui.selectedProfile(), func(updated machine.Profile) error {
+			nextProfiles := append([]machine.Profile(nil), ui.profiles...)
+			nextProfiles[ui.selectedIndex] = updated
+
+			if ui.saveProfiles != nil {
+				if err := ui.saveProfiles(nextProfiles); err != nil {
+					return err
+				}
+			}
+
+			ui.profiles = nextProfiles
 			ui.list.Refresh()
 			ui.selectProfile(ui.selectedIndex)
+			return nil
 		})
 	})
 
@@ -119,7 +148,7 @@ func (ui *appUI) content() fyne.CanvasObject {
 		ui.summaryLabel,
 	)
 
-	actions := container.NewHBox(editButton, launchButton)
+	actions := container.NewHBox(addButton, editButton, launchButton)
 
 	rightPane := container.NewBorder(
 		nil,
@@ -164,4 +193,22 @@ func (ui *appUI) selectProfile(id widget.ListItemID) {
 	ui.descriptionLabel.SetText(profile.Description)
 	ui.summaryLabel.SetText(profileSummary(profile))
 	ui.preview.SetText(dosbox.Render(profile))
+}
+
+func newMachineProfile() machine.Profile {
+	return machine.Profile{
+		Name:         "New Machine",
+		Description:  "",
+		CPUCore:      "auto",
+		CPUType:      "486",
+		Cycles:       "25000",
+		Machine:      "svga_s3",
+		MemoryMB:     16,
+		SoundBlaster: "sb16",
+		JoystickType: "auto",
+		GUS:          false,
+		XMS:          true,
+		EMS:          true,
+		UMB:          true,
+	}
 }

@@ -18,6 +18,7 @@ mise run run
 
 For development in this repo, `mise run run` uses the checked-in [machines.json](/Users/nizmow/Code/RigControl/machines.json).
 The app also supports `--machines-config /path/to/machines.json` to load a different machine set.
+Machines added or edited in the UI are saved back to the active machine config file.
 
 ## Project Notes
 

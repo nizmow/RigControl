@@ -6,7 +6,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
 	"rigcontrol/internal/machine"
@@ -28,13 +27,16 @@ type profileForm struct {
 	umb          *widget.Check
 }
 
-func showProfileEditor(window fyne.Window, profile machine.Profile, onSave func(machine.Profile)) {
+func showProfileEditor(window fyne.Window, profile machine.Profile, onSave func(machine.Profile) error) {
 	form := newProfileForm(profile)
 	errorLabel := widget.NewLabel("")
 	errorLabel.Wrapping = fyne.TextWrapWord
 
 	saveButton := widget.NewButton("Save", nil)
 	cancelButton := widget.NewButton("Cancel", nil)
+
+	editorWindow := fyne.CurrentApp().NewWindow("Edit Machine")
+	editorWindow.Resize(fyne.NewSize(620, 760))
 
 	content := container.NewBorder(
 		nil,
@@ -61,11 +63,11 @@ func showProfileEditor(window fyne.Window, profile machine.Profile, onSave func(
 		),
 	)
 
-	editor := dialog.NewCustom("Edit Machine", "", content, window)
-	editor.Resize(fyne.NewSize(520, 620))
+	editorWindow.SetContent(container.NewPadded(content))
+	editorWindow.CenterOnScreen()
 
 	cancelButton.OnTapped = func() {
-		editor.Hide()
+		editorWindow.Close()
 	}
 	saveButton.OnTapped = func() {
 		updated, err := form.profile()
@@ -73,11 +75,14 @@ func showProfileEditor(window fyne.Window, profile machine.Profile, onSave func(
 			errorLabel.SetText(err.Error())
 			return
 		}
-		onSave(updated)
-		editor.Hide()
+		if err := onSave(updated); err != nil {
+			errorLabel.SetText(err.Error())
+			return
+		}
+		editorWindow.Close()
 	}
 
-	editor.Show()
+	editorWindow.Show()
 }
 
 func newProfileForm(profile machine.Profile) *profileForm {

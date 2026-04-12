@@ -23,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := ui.RunWithProfiles(profiles); err != nil {
+	if err := ui.RunWithProfiles(profiles, store.SaveProfiles); err != nil {
 		log.Fatal(err)
 	}
 }

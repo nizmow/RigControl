@@ -75,3 +75,50 @@ func TestLoadProfilesRejectsInvalidConfig(t *testing.T) {
 		t.Fatalf("LoadProfiles() error = %v, want profile validation message", err)
 	}
 }
+
+func TestSaveProfilesWritesConfigFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	store := Store{Path: path}
+	profiles := []Profile{
+		{
+			Name:         "Saved 486",
+			Description:  "Persisted machine",
+			CPUCore:      "auto",
+			CPUType:      "486",
+			Cycles:       "25000",
+			Machine:      "svga_s3",
+			MemoryMB:     16,
+			SoundBlaster: "sb16",
+			GUS:          false,
+			JoystickType: "auto",
+			XMS:          true,
+			EMS:          true,
+			UMB:          true,
+		},
+	}
+
+	if err := store.SaveProfiles(profiles); err != nil {
+		t.Fatalf("SaveProfiles() error = %v", err)
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(content), `"name": "Saved 486"`) {
+		t.Fatalf("saved content missing expected profile: %s", string(content))
+	}
+}
+
+func TestSaveProfilesRejectsInvalidProfiles(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	store := Store{Path: path}
+
+	err := store.SaveProfiles([]Profile{{}})
+	if err == nil {
+		t.Fatal("SaveProfiles() error = nil, want validation error")
+	}
+	if !strings.Contains(err.Error(), "profile name is required") {
+		t.Fatalf("SaveProfiles() error = %v, want validation message", err)
+	}
+}

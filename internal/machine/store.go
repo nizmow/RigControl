@@ -53,6 +53,33 @@ func (s Store) LoadProfiles() ([]Profile, error) {
 	return profiles, nil
 }
 
+func (s Store) SaveProfiles(profiles []Profile) error {
+	if len(profiles) == 0 {
+		return fmt.Errorf("no machine profiles to save")
+	}
+
+	cloned := cloneProfiles(profiles)
+	for i, profile := range cloned {
+		if err := ValidateProfile(profile); err != nil {
+			return fmt.Errorf("save machine config %s profile %d (%q): %w", s.Path, i, profile.Name, err)
+		}
+	}
+
+	payload, err := json.MarshalIndent(fileData{Profiles: cloned}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal machine config %s: %w", s.Path, err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(s.Path), 0o755); err != nil {
+		return fmt.Errorf("create machine config dir for %s: %w", s.Path, err)
+	}
+	if err := os.WriteFile(s.Path, append(payload, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write machine config %s: %w", s.Path, err)
+	}
+
+	return nil
+}
+
 func cloneProfiles(profiles []Profile) []Profile {
 	return append([]Profile(nil), profiles...)
 }

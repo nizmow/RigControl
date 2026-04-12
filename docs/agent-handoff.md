@@ -7,7 +7,7 @@ RigControl is a Go/Fyne desktop app that builds DOSBox Staging machine configs f
 Current product shape:
 
 - Load machine profiles from JSON.
-- Edit the profile in the UI.
+- Add or edit machine profiles in the UI and persist them back to the active JSON config.
 - Preview the generated DOSBox config.
 - Launch DOSBox Staging with a temporary config file.
 
@@ -44,8 +44,6 @@ Launch flow:
 Current limitation:
 
 - The executable path is not yet configurable.
-- Saving machine profiles is not implemented yet.
-
 ## Machine Config Loading
 
 Default path:
@@ -58,6 +56,7 @@ Startup behavior:
 - If no override is provided, it uses the OS config location.
 - In-repo development should prefer `mise run run`, which passes the checked-in repo `machines.json`.
 - The app no longer falls back to built-in presets in code if the JSON file is missing.
+- Edits are saved back to whichever machine config path was loaded at startup.
 
 ## Option Regeneration
 
@@ -95,12 +94,12 @@ Use `mise` tasks by default:
 - The UI uses dropdowns only for settings that have documented bounded values.
 - `cpu_cycles` remains free-form because DOSBox accepts numeric values and `max`.
 - Machine definitions are JSON-backed and loaded at startup.
-- Saving profiles is not implemented yet.
+- Adding or editing a machine persists immediately after a successful editor-window save.
 
 ## Obvious Next Steps
 
 - Make the DOSBox executable path configurable.
-- Persist user-created profiles instead of only editing built-in presets in memory.
+- Add support for deleting or duplicating machines in the JSON-backed store.
 - Let users launch a game, folder, or disk image together with the selected machine config.
 - Expand the generated option coverage beyond the current five bounded settings.
 - Separate UI state management from widget construction once the form grows.
