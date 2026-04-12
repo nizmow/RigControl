@@ -19,6 +19,14 @@ func ValidateProfile(profile Profile) error {
 	if strings.TrimSpace(profile.SoundBlaster) == "" {
 		return errors.New("sound blaster type is required")
 	}
+	if strings.TrimSpace(profile.MouseCapture) == "" {
+		return errors.New("mouse capture mode is required")
+	}
+	for i, path := range profile.FloppyDiskImages {
+		if strings.TrimSpace(path) == "" {
+			return fmt.Errorf("floppy disk %d path is required", i+1)
+		}
+	}
 	if (strings.TrimSpace(profile.HardDiskImage) == "") != (strings.TrimSpace(profile.HardDiskCHS) == "") {
 		return errors.New("hard disk image and CHS geometry must both be set")
 	}

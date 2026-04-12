@@ -12,6 +12,7 @@ func TestValidateProfile(t *testing.T) {
 		Machine:      "svga_s3",
 		MemoryMB:     16,
 		SoundBlaster: "sb16",
+		MouseCapture: "onclick",
 		JoystickType: "auto",
 		GUS:          false,
 		XMS:          true,
@@ -47,6 +48,18 @@ func TestValidateProfile(t *testing.T) {
 			name:    "missing sound blaster",
 			profile: withProfile(valid, func(p *Profile) { p.SoundBlaster = "" }),
 			wantErr: "sound blaster type is required",
+		},
+		{
+			name:    "missing mouse capture",
+			profile: withProfile(valid, func(p *Profile) { p.MouseCapture = "" }),
+			wantErr: "mouse capture mode is required",
+		},
+		{
+			name: "blank floppy path",
+			profile: withProfile(valid, func(p *Profile) {
+				p.FloppyDiskImages = []string{"disk1.img", " "}
+			}),
+			wantErr: "floppy disk 2 path is required",
 		},
 		{
 			name:    "missing joystick type",

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const appConfigDirName = "RigControl"
@@ -83,6 +84,8 @@ func cloneProfiles(profiles []Profile) []Profile {
 func validatedProfiles(profiles []Profile) ([]Profile, error) {
 	cloned := cloneProfiles(profiles)
 	for i, profile := range cloned {
+		profile = normalizeProfile(profile)
+		cloned[i] = profile
 		if err := ValidateProfile(profile); err != nil {
 			return nil, profileError{
 				Index: i,
@@ -93,6 +96,16 @@ func validatedProfiles(profiles []Profile) ([]Profile, error) {
 	}
 
 	return cloned, nil
+}
+
+func normalizeProfile(profile Profile) Profile {
+	defaults := NewProfile()
+	if strings.TrimSpace(profile.MouseCapture) == "" {
+		profile.MouseCapture = defaults.MouseCapture
+		profile.MouseRawInput = defaults.MouseRawInput
+		profile.DOSMouseImmediate = defaults.DOSMouseImmediate
+	}
+	return profile
 }
 
 type profileError struct {

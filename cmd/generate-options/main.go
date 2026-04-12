@@ -36,6 +36,7 @@ func main() {
 		{GoName: "MachineOptions", ConfKey: "machine"},
 		{GoName: "CPUCoreOptions", ConfKey: "core"},
 		{GoName: "CPUTypeOptions", ConfKey: "cputype"},
+		{GoName: "MouseCaptureOptions", ConfKey: "mouse_capture"},
 		{GoName: "SoundBlasterOptions", ConfKey: "sbtype"},
 		{GoName: "JoystickTypeOptions", ConfKey: "joysticktype"},
 	}

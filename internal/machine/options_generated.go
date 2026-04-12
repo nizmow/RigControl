@@ -47,6 +47,13 @@ var MachineOptions = []string{
 	"vesa_oldvbe",
 }
 
+var MouseCaptureOptions = []string{
+	"seamless",
+	"onclick",
+	"onstart",
+	"nomouse",
+}
+
 var SoundBlasterOptions = []string{
 	"gb",
 	"sb1",

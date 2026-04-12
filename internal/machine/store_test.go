@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -57,6 +58,12 @@ func TestLoadProfilesReadsConfigFile(t *testing.T) {
 	if got := profiles[0].Name; got != "Custom 386" {
 		t.Fatalf("profiles[0].Name = %q, want %q", got, "Custom 386")
 	}
+	if got := profiles[0].MouseCapture; got != "onclick" {
+		t.Fatalf("profiles[0].MouseCapture = %q, want %q", got, "onclick")
+	}
+	if got := profiles[0].MouseRawInput; got != true {
+		t.Fatalf("profiles[0].MouseRawInput = %v, want true", got)
+	}
 }
 
 func TestLoadProfilesRejectsInvalidConfig(t *testing.T) {
@@ -82,19 +89,21 @@ func TestSaveProfilesWritesConfigFile(t *testing.T) {
 	store := Store{Path: path}
 	profiles := []Profile{
 		{
-			Name:         "Saved 486",
-			Description:  "Persisted machine",
-			CPUCore:      "auto",
-			CPUType:      "486",
-			Cycles:       "25000",
-			Machine:      "svga_s3",
-			MemoryMB:     16,
-			SoundBlaster: "sb16",
-			GUS:          false,
-			JoystickType: "auto",
-			XMS:          true,
-			EMS:          true,
-			UMB:          true,
+			Name:          "Saved 486",
+			Description:   "Persisted machine",
+			CPUCore:       "auto",
+			CPUType:       "486",
+			Cycles:        "25000",
+			Machine:       "svga_s3",
+			MemoryMB:      16,
+			SoundBlaster:  "sb16",
+			MouseCapture:  "onclick",
+			MouseRawInput: true,
+			GUS:           false,
+			JoystickType:  "auto",
+			XMS:           true,
+			EMS:           true,
+			UMB:           true,
 		},
 	}
 
@@ -129,19 +138,21 @@ func TestSaveProfilesThenLoadProfilesRoundTrip(t *testing.T) {
 	store := Store{Path: path}
 	want := []Profile{
 		{
-			Name:         "Round Trip Machine",
-			Description:  "Stored and loaded",
-			CPUCore:      "dynamic",
-			CPUType:      "pentium",
-			Cycles:       "50000",
-			Machine:      "svga_s3",
-			MemoryMB:     32,
-			SoundBlaster: "sb16",
-			GUS:          true,
-			JoystickType: "auto",
-			XMS:          true,
-			EMS:          true,
-			UMB:          false,
+			Name:          "Round Trip Machine",
+			Description:   "Stored and loaded",
+			CPUCore:       "dynamic",
+			CPUType:       "pentium",
+			Cycles:        "50000",
+			Machine:       "svga_s3",
+			MemoryMB:      32,
+			SoundBlaster:  "sb16",
+			MouseCapture:  "onclick",
+			MouseRawInput: true,
+			GUS:           true,
+			JoystickType:  "auto",
+			XMS:           true,
+			EMS:           true,
+			UMB:           false,
 		},
 	}
 
@@ -157,7 +168,7 @@ func TestSaveProfilesThenLoadProfilesRoundTrip(t *testing.T) {
 	if len(got) != len(want) {
 		t.Fatalf("LoadProfiles() returned %d profiles, want %d", len(got), len(want))
 	}
-	if got[0] != want[0] {
+	if !reflect.DeepEqual(got[0], want[0]) {
 		t.Fatalf("LoadProfiles() profile = %#v, want %#v", got[0], want[0])
 	}
 }
@@ -168,14 +179,16 @@ func TestSaveProfilesCreatesParentDirectories(t *testing.T) {
 
 	err := store.SaveProfiles([]Profile{
 		{
-			Name:         "Nested Save",
-			CPUCore:      "auto",
-			CPUType:      "486",
-			Cycles:       "25000",
-			Machine:      "svga_s3",
-			MemoryMB:     16,
-			SoundBlaster: "sb16",
-			JoystickType: "auto",
+			Name:          "Nested Save",
+			CPUCore:       "auto",
+			CPUType:       "486",
+			Cycles:        "25000",
+			Machine:       "svga_s3",
+			MemoryMB:      16,
+			SoundBlaster:  "sb16",
+			MouseCapture:  "onclick",
+			MouseRawInput: true,
+			JoystickType:  "auto",
 		},
 	})
 	if err != nil {

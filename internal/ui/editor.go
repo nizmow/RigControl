@@ -15,6 +15,13 @@ import (
 	"rigcontrol/internal/machine"
 )
 
+const (
+	defaultEditorWindowWidth  = 900
+	defaultEditorWindowHeight = 760
+	minEditorWindowWidth      = 720
+	minEditorWindowHeight     = 560
+)
+
 type profileEditor struct {
 	window     fyne.Window
 	form       *profileForm
@@ -23,21 +30,30 @@ type profileEditor struct {
 }
 
 type profileForm struct {
-	name          *widget.Entry
-	description   *widget.Entry
-	cpuCore       *widget.Select
-	cpuType       *widget.Select
-	cycles        *widget.Entry
-	videoMachine  *widget.Select
-	memoryMB      *widget.Entry
-	soundBlaster  *widget.Select
-	hardDiskImage *widget.Entry
-	hardDiskCHS   *widget.Entry
-	joystickType  *widget.Select
-	gus           *widget.Check
-	xms           *widget.Check
-	ems           *widget.Check
-	umb           *widget.Check
+	name              *widget.Entry
+	description       *widget.Entry
+	cpuCore           *widget.Select
+	cpuType           *widget.Select
+	cycles            *widget.Entry
+	videoMachine      *widget.Select
+	memoryMB          *widget.Entry
+	soundBlaster      *widget.Select
+	mouseCapture      *widget.Select
+	mouseRawInput     *widget.Check
+	dosMouseImmediate *widget.Check
+	floppyDiskImages  []string
+	floppyList        *widget.List
+	floppySelection   int
+	moveFloppyUp      *widget.Button
+	moveFloppyDown    *widget.Button
+	removeFloppy      *widget.Button
+	hardDiskImage     *widget.Entry
+	hardDiskCHS       *widget.Entry
+	joystickType      *widget.Select
+	gus               *widget.Check
+	xms               *widget.Check
+	ems               *widget.Check
+	umb               *widget.Check
 }
 
 func showProfileEditor(window fyne.Window, profile machine.Profile, onSave func(machine.Profile) error) {
@@ -56,7 +72,7 @@ func newProfileEditor(profile machine.Profile, onSave func(machine.Profile) erro
 		onSave:     onSave,
 	}
 
-	editor.window.Resize(fyne.NewSize(620, 760))
+	editor.window.Resize(initialEditorWindowSize(fyne.CurrentApp()))
 	editor.window.SetContent(container.NewPadded(editor.content()))
 	editor.window.CenterOnScreen()
 
@@ -68,20 +84,21 @@ func (e *profileEditor) content() fyne.CanvasObject {
 	cancelButton := widget.NewButton("Cancel", func() {
 		e.window.Close()
 	})
+	body := container.NewVScroll(container.NewVBox(
+		e.errorLabel,
+		e.form.widget(e.window),
+		e.form.gus,
+		e.form.xms,
+		e.form.ems,
+		e.form.umb,
+	))
 
 	return container.NewBorder(
 		nil,
 		container.NewHBox(cancelButton, saveButton),
 		nil,
 		nil,
-		container.NewVBox(
-			e.errorLabel,
-			e.form.widget(e.window),
-			e.form.gus,
-			e.form.xms,
-			e.form.ems,
-			e.form.umb,
-		),
+		body,
 	)
 }
 
@@ -108,22 +125,48 @@ func newProfileForm(profile machine.Profile) *profileForm {
 	description.Wrapping = fyne.TextWrapWord
 
 	form := &profileForm{
-		name:          widget.NewEntry(),
-		description:   description,
-		cpuCore:       widget.NewSelect(machine.CPUCoreOptions, nil),
-		cpuType:       widget.NewSelect(machine.CPUTypeOptions, nil),
-		cycles:        widget.NewEntry(),
-		videoMachine:  widget.NewSelect(machine.MachineOptions, nil),
-		memoryMB:      widget.NewEntry(),
-		soundBlaster:  widget.NewSelect(machine.SoundBlasterOptions, nil),
-		hardDiskImage: widget.NewEntry(),
-		hardDiskCHS:   widget.NewEntry(),
-		joystickType:  widget.NewSelect(machine.JoystickTypeOptions, nil),
-		gus:           widget.NewCheck("Gravis Ultrasound", nil),
-		xms:           widget.NewCheck("XMS", nil),
-		ems:           widget.NewCheck("EMS", nil),
-		umb:           widget.NewCheck("UMB", nil),
+		name:              widget.NewEntry(),
+		description:       description,
+		cpuCore:           widget.NewSelect(machine.CPUCoreOptions, nil),
+		cpuType:           widget.NewSelect(machine.CPUTypeOptions, nil),
+		cycles:            widget.NewEntry(),
+		videoMachine:      widget.NewSelect(machine.MachineOptions, nil),
+		memoryMB:          widget.NewEntry(),
+		soundBlaster:      widget.NewSelect(machine.SoundBlasterOptions, nil),
+		mouseCapture:      widget.NewSelect(machine.MouseCaptureOptions, nil),
+		mouseRawInput:     widget.NewCheck("Use raw host mouse input", nil),
+		dosMouseImmediate: widget.NewCheck("Update DOS mouse immediately", nil),
+		floppyDiskImages:  nil,
+		floppySelection:   -1,
+		hardDiskImage:     widget.NewEntry(),
+		hardDiskCHS:       widget.NewEntry(),
+		joystickType:      widget.NewSelect(machine.JoystickTypeOptions, nil),
+		gus:               widget.NewCheck("Gravis Ultrasound", nil),
+		xms:               widget.NewCheck("XMS", nil),
+		ems:               widget.NewCheck("EMS", nil),
+		umb:               widget.NewCheck("UMB", nil),
 	}
+	form.floppyList = widget.NewList(
+		func() int { return len(form.floppyDiskImages) },
+		func() fyne.CanvasObject {
+			return newFloppyListRow()
+		},
+		func(id widget.ListItemID, obj fyne.CanvasObject) {
+			updateFloppyListRow(obj, id+1, form.floppyDiskImages[id])
+		},
+	)
+	form.floppyList.OnSelected = func(id widget.ListItemID) {
+		form.floppySelection = id
+		form.refreshFloppyButtons()
+	}
+	form.floppyList.OnUnselected = func(widget.ListItemID) {
+		form.floppySelection = -1
+		form.refreshFloppyButtons()
+	}
+	form.moveFloppyUp = widget.NewButton("Move Up", form.moveSelectedFloppyUp)
+	form.moveFloppyDown = widget.NewButton("Move Down", form.moveSelectedFloppyDown)
+	form.removeFloppy = widget.NewButton("Remove", form.removeSelectedFloppy)
+	form.refreshFloppyButtons()
 
 	form.setProfile(profile)
 	return form
@@ -151,10 +194,37 @@ func (f *profileForm) widget(window fyne.Window) fyne.CanvasObject {
 		widget.NewFormItem("Video", f.videoMachine),
 		widget.NewFormItem("Memory (MB)", f.memoryMB),
 		widget.NewFormItem("Sound", f.soundBlaster),
+		widget.NewFormItem("Mouse Capture", fieldWithHelp(f.mouseCapture, "How DOSBox grabs or releases the mouse in the host window.")),
+		widget.NewFormItem("Mouse", fieldWithHelp(container.NewVBox(f.mouseRawInput, f.dosMouseImmediate), "Raw input bypasses host acceleration while captured. Immediate updates can help some action games but may over-accelerate others.")),
+		widget.NewFormItem("Floppy Disks", f.buildFloppyEditor(window)),
 		widget.NewFormItem("HDD Image", container.NewBorder(nil, nil, nil, browseButton, f.hardDiskImage)),
-		widget.NewFormItem("HDD CHS", container.NewBorder(nil, nil, nil, autoFillCHSButton, f.hardDiskCHS)),
+		widget.NewFormItem("HDD CHS", fieldWithHelp(container.NewBorder(nil, nil, nil, autoFillCHSButton, f.hardDiskCHS), "Cylinder-head-sector geometry used for HDD image booting. Auto-fill works for images sized as 512-byte sectors, 63 sectors/track, 16 heads.")),
 		widget.NewFormItem("Joystick", f.joystickType),
 	)
+}
+
+func (f *profileForm) buildFloppyEditor(window fyne.Window) fyne.CanvasObject {
+	addButton := widget.NewButton("Add Disk...", func() {
+		f.pickFloppyDisk(window)
+	})
+
+	return container.NewBorder(
+		nil,
+		nil,
+		nil,
+		container.NewVBox(addButton, f.moveFloppyUp, f.moveFloppyDown, f.removeFloppy),
+		f.floppyList,
+	)
+}
+
+func fieldWithHelp(field fyne.CanvasObject, help string) fyne.CanvasObject {
+	if strings.TrimSpace(help) == "" {
+		return field
+	}
+	hint := widget.NewLabel(help)
+	hint.Wrapping = fyne.TextWrapWord
+	hint.Importance = widget.LowImportance
+	return container.NewVBox(field, hint)
 }
 
 func (f *profileForm) setProfile(profile machine.Profile) {
@@ -166,6 +236,14 @@ func (f *profileForm) setProfile(profile machine.Profile) {
 	f.videoMachine.SetSelected(profile.Machine)
 	f.memoryMB.SetText(fmt.Sprintf("%d", profile.MemoryMB))
 	f.soundBlaster.SetSelected(profile.SoundBlaster)
+	f.mouseCapture.SetSelected(profile.MouseCapture)
+	f.mouseRawInput.SetChecked(profile.MouseRawInput)
+	f.dosMouseImmediate.SetChecked(profile.DOSMouseImmediate)
+	f.floppyDiskImages = append([]string(nil), profile.FloppyDiskImages...)
+	f.floppySelection = -1
+	f.floppyList.UnselectAll()
+	f.floppyList.Refresh()
+	f.refreshFloppyButtons()
 	f.hardDiskImage.SetText(profile.HardDiskImage)
 	f.hardDiskCHS.SetText(profile.HardDiskCHS)
 	f.joystickType.SetSelected(profile.JoystickType)
@@ -177,20 +255,24 @@ func (f *profileForm) setProfile(profile machine.Profile) {
 
 func (f *profileForm) profile() (machine.Profile, error) {
 	profile := machine.Profile{
-		Name:          strings.TrimSpace(f.name.Text),
-		Description:   strings.TrimSpace(f.description.Text),
-		CPUCore:       strings.TrimSpace(f.cpuCore.Selected),
-		CPUType:       strings.TrimSpace(f.cpuType.Selected),
-		Cycles:        strings.TrimSpace(f.cycles.Text),
-		Machine:       strings.TrimSpace(f.videoMachine.Selected),
-		SoundBlaster:  strings.TrimSpace(f.soundBlaster.Selected),
-		HardDiskImage: strings.TrimSpace(f.hardDiskImage.Text),
-		HardDiskCHS:   strings.TrimSpace(f.hardDiskCHS.Text),
-		JoystickType:  strings.TrimSpace(f.joystickType.Selected),
-		GUS:           f.gus.Checked,
-		XMS:           f.xms.Checked,
-		EMS:           f.ems.Checked,
-		UMB:           f.umb.Checked,
+		Name:              strings.TrimSpace(f.name.Text),
+		Description:       strings.TrimSpace(f.description.Text),
+		CPUCore:           strings.TrimSpace(f.cpuCore.Selected),
+		CPUType:           strings.TrimSpace(f.cpuType.Selected),
+		Cycles:            strings.TrimSpace(f.cycles.Text),
+		Machine:           strings.TrimSpace(f.videoMachine.Selected),
+		SoundBlaster:      strings.TrimSpace(f.soundBlaster.Selected),
+		MouseCapture:      strings.TrimSpace(f.mouseCapture.Selected),
+		MouseRawInput:     f.mouseRawInput.Checked,
+		DOSMouseImmediate: f.dosMouseImmediate.Checked,
+		FloppyDiskImages:  append([]string(nil), f.floppyDiskImages...),
+		HardDiskImage:     strings.TrimSpace(f.hardDiskImage.Text),
+		HardDiskCHS:       strings.TrimSpace(f.hardDiskCHS.Text),
+		JoystickType:      strings.TrimSpace(f.joystickType.Selected),
+		GUS:               f.gus.Checked,
+		XMS:               f.xms.Checked,
+		EMS:               f.ems.Checked,
+		UMB:               f.umb.Checked,
 	}
 
 	if _, err := fmt.Sscanf(strings.TrimSpace(f.memoryMB.Text), "%d", &profile.MemoryMB); err != nil {
@@ -201,6 +283,104 @@ func (f *profileForm) profile() (machine.Profile, error) {
 	}
 
 	return profile, nil
+}
+
+func (f *profileForm) pickFloppyDisk(window fyne.Window) {
+	open := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+		if err != nil {
+			return
+		}
+		if reader == nil {
+			return
+		}
+		defer reader.Close()
+
+		f.addFloppyDiskPath(reader.URI().Path())
+	}, window)
+	if dir := preferredImageDir(f.selectedFloppyPath(), f.hardDiskImage.Text); dir != nil {
+		open.SetLocation(dir)
+	}
+	open.Show()
+}
+
+func (f *profileForm) addFloppyDiskPath(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+	f.floppyDiskImages = append(f.floppyDiskImages, path)
+	f.floppyList.Refresh()
+	f.floppyList.Select(len(f.floppyDiskImages) - 1)
+	f.refreshFloppyButtons()
+}
+
+func (f *profileForm) removeSelectedFloppy() {
+	if !f.hasSelectedFloppy() {
+		return
+	}
+	index := f.floppySelection
+	f.floppyDiskImages = append(f.floppyDiskImages[:index], f.floppyDiskImages[index+1:]...)
+	f.floppySelection = -1
+	f.floppyList.Refresh()
+	f.floppyList.UnselectAll()
+	if len(f.floppyDiskImages) > 0 {
+		next := index
+		if next >= len(f.floppyDiskImages) {
+			next = len(f.floppyDiskImages) - 1
+		}
+		f.floppyList.Select(next)
+	} else {
+		f.refreshFloppyButtons()
+	}
+}
+
+func (f *profileForm) moveSelectedFloppyUp() {
+	if !f.hasSelectedFloppy() || f.floppySelection == 0 {
+		return
+	}
+	index := f.floppySelection
+	f.floppyDiskImages[index-1], f.floppyDiskImages[index] = f.floppyDiskImages[index], f.floppyDiskImages[index-1]
+	f.floppyList.Refresh()
+	f.floppyList.Select(index - 1)
+}
+
+func (f *profileForm) moveSelectedFloppyDown() {
+	if !f.hasSelectedFloppy() || f.floppySelection >= len(f.floppyDiskImages)-1 {
+		return
+	}
+	index := f.floppySelection
+	f.floppyDiskImages[index], f.floppyDiskImages[index+1] = f.floppyDiskImages[index+1], f.floppyDiskImages[index]
+	f.floppyList.Refresh()
+	f.floppyList.Select(index + 1)
+}
+
+func (f *profileForm) selectedFloppyPath() string {
+	if !f.hasSelectedFloppy() {
+		return ""
+	}
+	return f.floppyDiskImages[f.floppySelection]
+}
+
+func (f *profileForm) hasSelectedFloppy() bool {
+	return f.floppySelection >= 0 && f.floppySelection < len(f.floppyDiskImages)
+}
+
+func (f *profileForm) refreshFloppyButtons() {
+	if f.hasSelectedFloppy() {
+		f.removeFloppy.Enable()
+	} else {
+		f.removeFloppy.Disable()
+	}
+	if f.hasSelectedFloppy() && f.floppySelection > 0 {
+		f.moveFloppyUp.Enable()
+	} else {
+		f.moveFloppyUp.Disable()
+	}
+	if f.hasSelectedFloppy() && f.floppySelection < len(f.floppyDiskImages)-1 {
+		f.moveFloppyDown.Enable()
+	} else {
+		f.moveFloppyDown.Disable()
+	}
 }
 
 func (f *profileForm) pickHardDiskImage(window fyne.Window) {
@@ -216,11 +396,8 @@ func (f *profileForm) pickHardDiskImage(window fyne.Window) {
 		f.setHardDiskImagePath(reader.URI().Path())
 	}, window)
 
-	if current := strings.TrimSpace(f.hardDiskImage.Text); current != "" {
-		dirURI := storage.NewFileURI(filepath.Dir(current))
-		if dir, err := storage.ListerForURI(dirURI); err == nil {
-			open.SetLocation(dir)
-		}
+	if dir := preferredImageDir(f.hardDiskImage.Text, f.selectedFloppyPath()); dir != nil {
+		open.SetLocation(dir)
 	}
 
 	open.Show()
@@ -231,6 +408,56 @@ func (f *profileForm) setHardDiskImagePath(path string) {
 	if chs, err := inferCHSFromImage(f.hardDiskImage.Text); err == nil {
 		f.hardDiskCHS.SetText(chs)
 	}
+}
+
+func preferredImageDir(paths ...string) fyne.ListableURI {
+	for _, candidate := range paths {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		dirURI := storage.NewFileURI(filepath.Dir(candidate))
+		if dir, err := storage.ListerForURI(dirURI); err == nil {
+			return dir
+		}
+	}
+	return nil
+}
+
+func newFloppyListRow() fyne.CanvasObject {
+	prefix := widget.NewLabel("1. ")
+	prefix.Wrapping = fyne.TextWrapOff
+	prefixContainer := container.NewWithoutLayout(prefix)
+	prefixContainer.Resize(fyne.NewSize(28, prefix.MinSize().Height))
+	return container.NewBorder(nil, nil, prefixContainer, nil, newPathValueLabel("/full/path/to/disk.img"))
+}
+
+func updateFloppyListRow(obj fyne.CanvasObject, index int, path string) {
+	row := obj.(*fyne.Container)
+	prefixContainer, pathValue := findFloppyRowParts(row)
+	if prefixContainer == nil || pathValue == nil {
+		panic("unexpected floppy row shape")
+	}
+	prefixContainer.Objects[0].(*widget.Label).SetText(fmt.Sprintf("%d. ", index))
+	pathValue.SetText(path)
+}
+
+func findFloppyRowParts(row *fyne.Container) (*fyne.Container, *pathValueLabel) {
+	var prefixContainer *fyne.Container
+	var pathValue *pathValueLabel
+	for _, obj := range row.Objects {
+		switch typed := obj.(type) {
+		case *fyne.Container:
+			if len(typed.Objects) == 1 {
+				if _, ok := typed.Objects[0].(*widget.Label); ok {
+					prefixContainer = typed
+				}
+			}
+		case *pathValueLabel:
+			pathValue = typed
+		}
+	}
+	return prefixContainer, pathValue
 }
 
 func inferCHSFromImage(path string) (string, error) {
@@ -264,4 +491,14 @@ func inferCHSFromImage(path string) (string, error) {
 	}
 
 	return fmt.Sprintf("%d,%d,%d,%d", bytesPerSector, sectorsPerTrack, heads, cylinders), nil
+}
+
+func initialEditorWindowSize(app fyne.App) fyne.Size {
+	return initialWindowSize(
+		app,
+		defaultEditorWindowWidth,
+		defaultEditorWindowHeight,
+		minEditorWindowWidth,
+		minEditorWindowHeight,
+	)
 }

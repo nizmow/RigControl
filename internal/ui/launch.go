@@ -46,6 +46,11 @@ func launchProfile(profile machine.Profile, configPath string) error {
 	if _, err := os.Stat(dosboxExecutable); err != nil {
 		return fmt.Errorf("dosbox executable not found at %s: %w", dosboxExecutable, err)
 	}
+	for _, path := range profile.FloppyDiskImages {
+		if _, err := os.Stat(path); err != nil {
+			return fmt.Errorf("floppy disk image not found at %s: %w", path, err)
+		}
+	}
 	if profile.HardDiskImage != "" {
 		if _, err := os.Stat(profile.HardDiskImage); err != nil {
 			return fmt.Errorf("hard disk image not found at %s: %w", profile.HardDiskImage, err)

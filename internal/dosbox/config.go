@@ -36,6 +36,11 @@ func Render(profile machine.Profile) string {
 	writeSection(&builder, "gus", map[string]string{
 		"gus": boolValue(profile.GUS),
 	})
+	writeSection(&builder, "mouse", map[string]string{
+		"dos_mouse_immediate": boolValue(profile.DOSMouseImmediate),
+		"mouse_capture":       profile.MouseCapture,
+		"mouse_raw_input":     boolValue(profile.MouseRawInput),
+	})
 	writeSection(&builder, "joystick", map[string]string{
 		"joysticktype": profile.JoystickType,
 	})
@@ -75,13 +80,23 @@ func writeListSection(builder *strings.Builder, name string, values []string) {
 }
 
 func autoexecCommands(profile machine.Profile) []string {
-	if profile.HardDiskImage == "" {
-		return nil
+	commands := make([]string, 0, 2)
+	if len(profile.FloppyDiskImages) > 0 {
+		var builder strings.Builder
+		builder.WriteString("imgmount a")
+		for _, path := range profile.FloppyDiskImages {
+			builder.WriteString(fmt.Sprintf(` "%s"`, path))
+		}
+		builder.WriteString(" -t floppy")
+		commands = append(commands, builder.String())
 	}
-	return []string{
-		fmt.Sprintf(`imgmount 2 "%s" -t hdd -fs none -size %s`, profile.HardDiskImage, profile.HardDiskCHS),
-		"boot -l c",
+	if profile.HardDiskImage != "" {
+		commands = append(commands,
+			fmt.Sprintf(`imgmount 2 "%s" -t hdd -fs none -size %s`, profile.HardDiskImage, profile.HardDiskCHS),
+			"boot -l c",
+		)
 	}
+	return commands
 }
 
 func boolValue(enabled bool) string {

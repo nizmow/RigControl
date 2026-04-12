@@ -14,6 +14,13 @@ import (
 	"rigcontrol/internal/machine"
 )
 
+const (
+	defaultMainWindowWidth  = 1280
+	defaultMainWindowHeight = 800
+	minMainWindowWidth      = 960
+	minMainWindowHeight     = 640
+)
+
 type appUI struct {
 	window           fyne.Window
 	saveProfiles     func([]machine.Profile) error
@@ -22,8 +29,7 @@ type appUI struct {
 	list             *widget.List
 	nameLabel        *widget.Label
 	descriptionLabel *widget.Label
-	summaryLabel     *widget.Label
-	preview          *widget.Entry
+	summaryBox       *fyne.Container
 }
 
 func RunWithProfiles(profiles []machine.Profile, saveProfiles func([]machine.Profile) error) error {
@@ -33,7 +39,7 @@ func RunWithProfiles(profiles []machine.Profile, saveProfiles func([]machine.Pro
 
 	fyneApp := app.NewWithID("com.nizmow.rigcontrol")
 	window := fyneApp.NewWindow("RigControl")
-	window.Resize(fyne.NewSize(1080, 720))
+	window.Resize(initialMainWindowSize(fyneApp))
 
 	ui := newAppUI(window, profiles, saveProfiles)
 	window.SetContent(ui.content())
@@ -51,15 +57,11 @@ func newAppUI(window fyne.Window, profiles []machine.Profile, saveProfiles func(
 		selectedIndex:    0,
 		nameLabel:        widget.NewLabel(""),
 		descriptionLabel: widget.NewLabel(""),
-		summaryLabel:     widget.NewLabel(""),
-		preview:          widget.NewMultiLineEntry(),
+		summaryBox:       container.NewVBox(),
 	}
 
 	ui.nameLabel.TextStyle = fyne.TextStyle{Bold: true}
 	ui.descriptionLabel.Wrapping = fyne.TextWrapWord
-	ui.summaryLabel.Wrapping = fyne.TextWrapWord
-	ui.preview.Wrapping = fyne.TextWrapOff
-	ui.preview.Disable()
 
 	ui.list = widget.NewList(
 		func() int { return len(ui.profiles) },
@@ -84,12 +86,13 @@ func (ui *appUI) content() fyne.CanvasObject {
 		showProfileEditor(ui.window, ui.selectedProfile(), ui.updateSelectedProfile)
 	})
 
+	previewButton := widget.NewButton("Preview Config", ui.showConfigPreview)
 	launchButton := widget.NewButton("Launch DOSBox", ui.launchSelectedProfile)
 
 	leftPane := ui.buildLeftPane()
-	rightPane := ui.buildRightPane(addButton, editButton, launchButton)
+	rightPane := ui.buildRightPane(addButton, editButton, previewButton, launchButton)
 
-	split := container.NewHSplit(container.NewPadded(leftPane), container.NewPadded(rightPane))
+	split := container.NewHSplit(leftPane, rightPane)
 	split.SetOffset(0.28)
 
 	return split
@@ -153,30 +156,19 @@ func (ui *appUI) launchSelectedProfile() {
 }
 
 func (ui *appUI) buildLeftPane() fyne.CanvasObject {
-	return container.NewBorder(
+	return container.NewPadded(container.NewBorder(
 		widget.NewLabel("Machine Types"),
 		nil,
 		nil,
 		nil,
 		ui.list,
-	)
+	))
 }
 
 func (ui *appUI) buildRightPane(objects ...fyne.CanvasObject) fyne.CanvasObject {
 	actions := container.NewHBox(objects...)
-	split := container.NewVSplit(
-		container.NewPadded(ui.buildSummaryPane()),
-		container.NewBorder(
-			widget.NewLabel("DOSBox Config Preview"),
-			nil,
-			nil,
-			nil,
-			ui.preview,
-		),
-	)
-	split.SetOffset(0.42)
-
-	return container.NewBorder(nil, actions, nil, nil, split)
+	summaryScroll := container.NewVScroll(ui.buildSummaryPane())
+	return container.NewPadded(container.NewBorder(nil, actions, nil, nil, summaryScroll))
 }
 
 func (ui *appUI) buildSummaryPane() fyne.CanvasObject {
@@ -185,7 +177,7 @@ func (ui *appUI) buildSummaryPane() fyne.CanvasObject {
 		ui.descriptionLabel,
 		widget.NewSeparator(),
 		widget.NewLabel("Configuration Summary"),
-		ui.summaryLabel,
+		ui.summaryBox,
 	)
 }
 
@@ -193,8 +185,8 @@ func (ui *appUI) refreshSelectedProfile() {
 	profile := ui.selectedProfile()
 	ui.nameLabel.SetText(profile.Name)
 	ui.descriptionLabel.SetText(profile.Description)
-	ui.summaryLabel.SetText(profileSummary(profile))
-	ui.preview.SetText(dosbox.Render(profile))
+	ui.summaryBox.Objects = buildSummaryObjects(profileSummaryLines(profile))
+	ui.summaryBox.Refresh()
 }
 
 func (ui *appUI) selectProfile(id widget.ListItemID) {
@@ -204,4 +196,80 @@ func (ui *appUI) selectProfile(id widget.ListItemID) {
 
 	ui.selectedIndex = id
 	ui.refreshSelectedProfile()
+}
+
+func (ui *appUI) showConfigPreview() {
+	previewWindow := fyne.CurrentApp().NewWindow("DOSBox Config Preview")
+	previewWindow.Resize(fyne.NewSize(760, 620))
+
+	preview := widget.NewMultiLineEntry()
+	preview.Wrapping = fyne.TextWrapOff
+	preview.SetText(dosbox.Render(ui.selectedProfile()))
+	preview.Disable()
+
+	closeButton := widget.NewButton("Close", func() {
+		previewWindow.Close()
+	})
+
+	previewWindow.SetContent(container.NewBorder(
+		widget.NewLabel("Generated DOSBox Config"),
+		container.NewHBox(closeButton),
+		nil,
+		nil,
+		container.NewPadded(preview),
+	))
+	previewWindow.CenterOnScreen()
+	previewWindow.Show()
+}
+
+func buildSummaryObjects(lines []summaryLine) []fyne.CanvasObject {
+	objects := make([]fyne.CanvasObject, 0, len(lines))
+	for _, line := range lines {
+		if line.IsPath {
+			objects = append(objects, newSummaryPathRow(line.Label, line.Value))
+			continue
+		}
+		label := widget.NewLabel(line.Label + ": " + line.Value)
+		label.Wrapping = fyne.TextWrapBreak
+		objects = append(objects, label)
+	}
+	return objects
+}
+
+func newSummaryPathRow(label, value string) fyne.CanvasObject {
+	prefix := widget.NewLabel(label + ": ")
+	prefix.Wrapping = fyne.TextWrapOff
+	return container.NewBorder(nil, nil, prefix, nil, newPathValueLabel(value))
+}
+
+func initialMainWindowSize(app fyne.App) fyne.Size {
+	return initialWindowSize(
+		app,
+		defaultMainWindowWidth,
+		defaultMainWindowHeight,
+		minMainWindowWidth,
+		minMainWindowHeight,
+	)
+}
+
+func initialWindowSize(app fyne.App, defaultWidth, defaultHeight, minWidth, minHeight float32) fyne.Size {
+	if app != nil && app.Driver() != nil {
+		if screenDriver, ok := app.Driver().(interface{ ScreenSize() fyne.Size }); ok {
+			screen := screenDriver.ScreenSize()
+			if screen.Width > 0 && screen.Height > 0 {
+				return fyne.NewSize(
+					maxFloat32(minWidth, screen.Width*2/3),
+					maxFloat32(minHeight, screen.Height*2/3),
+				)
+			}
+		}
+	}
+	return fyne.NewSize(defaultWidth, defaultHeight)
+}
+
+func maxFloat32(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
 }
