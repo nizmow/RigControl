@@ -1,0 +1,18 @@
+[tools]
+go = "1.26.0"
+
+[tasks.run]
+description = "Run RigControl"
+run = "go run ./cmd/rigcontrol"
+
+[tasks.build]
+description = "Build RigControl"
+run = "go build ./cmd/rigcontrol"
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.tidy]
+description = "Sync Go module dependencies"
+run = "go mod tidy"

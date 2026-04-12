@@ -1,0 +1,28 @@
+# Build outputs
+/rigcontrol
+/RigControl
+/bin/
+/dist/
+/build/
+
+# Go
+*.test
+*.out
+coverage.out
+
+# Fyne packaging
+/fyne-cross/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Local environment overrides
+.env
+.env.*
+.mise.local.toml
