@@ -15,15 +15,15 @@ type summaryLine struct {
 
 func profileSummaryLines(profile machine.Profile) []summaryLine {
 	lines := []summaryLine{
-		{Label: "CPU", Value: fmt.Sprintf("%s / %s", profile.CPUCore, profile.CPUType)},
-		{Label: "Cycles", Value: profile.Cycles},
-		{Label: "Video", Value: profile.Machine},
+		{Label: "CPU", Value: fmt.Sprintf("%s / %s", machine.DisplayLabel(profile.CPUCore), machine.DisplayLabel(profile.CPUType))},
+		{Label: "Cycles", Value: cyclesSummary(profile)},
+		{Label: "Video", Value: machine.DisplayLabel(profile.Machine)},
 		{Label: "Memory", Value: fmt.Sprintf("%d MB", profile.MemoryMB)},
-		{Label: "Sound Blaster", Value: profile.SoundBlaster},
-		{Label: "Mouse Capture", Value: profile.MouseCapture},
+		{Label: "Sound Blaster", Value: machine.DisplayLabel(profile.SoundBlaster)},
+		{Label: "Mouse Capture", Value: machine.DisplayLabel(profile.MouseCapture)},
 		{Label: "Mouse Raw Input", Value: yesNo(profile.MouseRawInput)},
 		{Label: "Mouse Immediate", Value: yesNo(profile.DOSMouseImmediate)},
-		{Label: "Joystick", Value: profile.JoystickType},
+		{Label: "Joystick", Value: machine.DisplayLabel(profile.JoystickType)},
 		{Label: "GUS", Value: onOff(profile.GUS)},
 		{Label: "XMS / EMS / UMB", Value: fmt.Sprintf("%s / %s / %s", yesNo(profile.XMS), yesNo(profile.EMS), yesNo(profile.UMB))},
 	}
@@ -44,6 +44,14 @@ func profileSummaryLines(profile machine.Profile) []summaryLine {
 	}
 
 	return lines
+}
+
+func cyclesSummary(profile machine.Profile) string {
+	cycles := strings.TrimSpace(profile.Cycles)
+	if profile.FixedCycles && cycles != "auto" && cycles != "max" {
+		return fmt.Sprintf("%s (Fixed)", cycles)
+	}
+	return cycles
 }
 
 func profileSummary(profile machine.Profile) string {

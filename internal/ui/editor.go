@@ -133,21 +133,21 @@ func newProfileForm(profile machine.Profile) *profileForm {
 	form := &profileForm{
 		name:              widget.NewEntry(),
 		description:       description,
-		cpuCore:           widget.NewSelect(machine.CPUCoreOptions, nil),
-		cpuType:           widget.NewSelect(machine.CPUTypeOptions, nil),
+		cpuCore:           widget.NewSelect(machine.DisplayLabels(machine.CPUCoreOptions), nil),
+		cpuType:           widget.NewSelect(machine.DisplayLabels(machine.CPUTypeOptions), nil),
 		cycles:            widget.NewEntry(),
 		fixedCycles:       widget.NewCheck("Fixed", nil),
-		videoMachine:      widget.NewSelect(machine.MachineOptions, nil),
+		videoMachine:      widget.NewSelect(machine.DisplayLabels(machine.MachineOptions), nil),
 		memoryMB:          widget.NewEntry(),
-		soundBlaster:      widget.NewSelect(machine.SoundBlasterOptions, nil),
-		mouseCapture:      widget.NewSelect(machine.MouseCaptureOptions, nil),
+		soundBlaster:      widget.NewSelect(machine.DisplayLabels(machine.SoundBlasterOptions), nil),
+		mouseCapture:      widget.NewSelect(machine.DisplayLabels(machine.MouseCaptureOptions), nil),
 		mouseRawInput:     widget.NewCheck("Use raw host mouse input", nil),
 		dosMouseImmediate: widget.NewCheck("Update DOS mouse immediately", nil),
 		floppyDiskImages:  nil,
 		floppySelection:   -1,
 		hardDiskImage:     widget.NewEntry(),
 		hardDiskCHS:       widget.NewEntry(),
-		joystickType:      widget.NewSelect(machine.JoystickTypeOptions, nil),
+		joystickType:      widget.NewSelect(machine.DisplayLabels(machine.JoystickTypeOptions), nil),
 		gus:               widget.NewCheck("Gravis Ultrasound", nil),
 		xms:               widget.NewCheck("XMS", nil),
 		ems:               widget.NewCheck("EMS", nil),
@@ -281,14 +281,14 @@ func fieldWithHelp(field fyne.CanvasObject, help string) fyne.CanvasObject {
 func (f *profileForm) setProfile(profile machine.Profile) {
 	f.name.SetText(profile.Name)
 	f.description.SetText(profile.Description)
-	f.cpuCore.SetSelected(profile.CPUCore)
-	f.cpuType.SetSelected(profile.CPUType)
+	f.cpuCore.SetSelected(machine.DisplayLabel(profile.CPUCore))
+	f.cpuType.SetSelected(machine.DisplayLabel(profile.CPUType))
 	f.cycles.SetText(profile.Cycles)
 	f.fixedCycles.SetChecked(profile.FixedCycles)
-	f.videoMachine.SetSelected(profile.Machine)
+	f.videoMachine.SetSelected(machine.DisplayLabel(profile.Machine))
 	f.memoryMB.SetText(fmt.Sprintf("%d", profile.MemoryMB))
-	f.soundBlaster.SetSelected(profile.SoundBlaster)
-	f.mouseCapture.SetSelected(profile.MouseCapture)
+	f.soundBlaster.SetSelected(machine.DisplayLabel(profile.SoundBlaster))
+	f.mouseCapture.SetSelected(machine.DisplayLabel(profile.MouseCapture))
 	f.mouseRawInput.SetChecked(profile.MouseRawInput)
 	f.dosMouseImmediate.SetChecked(profile.DOSMouseImmediate)
 	f.floppyDiskImages = append([]string(nil), profile.FloppyDiskImages...)
@@ -298,7 +298,7 @@ func (f *profileForm) setProfile(profile machine.Profile) {
 	f.refreshFloppyButtons()
 	f.hardDiskImage.SetText(profile.HardDiskImage)
 	f.hardDiskCHS.SetText(profile.HardDiskCHS)
-	f.joystickType.SetSelected(profile.JoystickType)
+	f.joystickType.SetSelected(machine.DisplayLabel(profile.JoystickType))
 	f.gus.SetChecked(profile.GUS)
 	f.xms.SetChecked(profile.XMS)
 	f.ems.SetChecked(profile.EMS)
@@ -309,19 +309,19 @@ func (f *profileForm) profile() (machine.Profile, error) {
 	profile := machine.Profile{
 		Name:              strings.TrimSpace(f.name.Text),
 		Description:       strings.TrimSpace(f.description.Text),
-		CPUCore:           strings.TrimSpace(f.cpuCore.Selected),
-		CPUType:           strings.TrimSpace(f.cpuType.Selected),
+		CPUCore:           machine.InternalKey(strings.TrimSpace(f.cpuCore.Selected)),
+		CPUType:           machine.InternalKey(strings.TrimSpace(f.cpuType.Selected)),
 		Cycles:            strings.TrimSpace(f.cycles.Text),
 		FixedCycles:       f.fixedCycles.Checked,
-		Machine:           strings.TrimSpace(f.videoMachine.Selected),
-		SoundBlaster:      strings.TrimSpace(f.soundBlaster.Selected),
-		MouseCapture:      strings.TrimSpace(f.mouseCapture.Selected),
+		Machine:           machine.InternalKey(strings.TrimSpace(f.videoMachine.Selected)),
+		SoundBlaster:      machine.InternalKey(strings.TrimSpace(f.soundBlaster.Selected)),
+		MouseCapture:      machine.InternalKey(strings.TrimSpace(f.mouseCapture.Selected)),
 		MouseRawInput:     f.mouseRawInput.Checked,
 		DOSMouseImmediate: f.dosMouseImmediate.Checked,
 		FloppyDiskImages:  append([]string(nil), f.floppyDiskImages...),
 		HardDiskImage:     strings.TrimSpace(f.hardDiskImage.Text),
 		HardDiskCHS:       strings.TrimSpace(f.hardDiskCHS.Text),
-		JoystickType:      strings.TrimSpace(f.joystickType.Selected),
+		JoystickType:      machine.InternalKey(strings.TrimSpace(f.joystickType.Selected)),
 		GUS:               f.gus.Checked,
 		XMS:               f.xms.Checked,
 		EMS:               f.ems.Checked,

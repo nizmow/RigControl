@@ -28,21 +28,34 @@ func TestProfileSummaryIncludesExpectedLines(t *testing.T) {
 	summary := profileSummary(profile)
 
 	for _, want := range []string{
-		"CPU: dynamic / pentium",
+		"CPU: Dynamic (JIT) (dynamic) / Intel Pentium (pentium)",
 		"Cycles: 50000",
-		"Video: svga_s3",
+		"Video: S3 Trio64 (SVGA) (svga_s3)",
 		"Memory: 32 MB",
-		"Sound Blaster: sb16",
-		"Mouse Capture: onclick",
+		"Sound Blaster: Sound Blaster 16 (sb16)",
+		"Mouse Capture: On Click (onclick)",
 		"Mouse Raw Input: yes",
 		"Mouse Immediate: no",
-		"Joystick: auto",
+		"Joystick: Automatic (auto)",
 		"GUS: on",
 		"XMS / EMS / UMB: yes / no / yes",
 	} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("profileSummary() missing %q:\n%s", want, summary)
 		}
+	}
+}
+
+func TestProfileSummaryIncludesFixedCycles(t *testing.T) {
+	profile := machine.Profile{
+		Cycles:      "3000",
+		FixedCycles: true,
+	}
+
+	summary := profileSummary(profile)
+	want := "Cycles: 3000 (Fixed)"
+	if !strings.Contains(summary, want) {
+		t.Fatalf("profileSummary() missing %q:\n%s", want, summary)
 	}
 }
 
@@ -68,6 +81,7 @@ func TestProfileSummaryIncludesHardDiskDetails(t *testing.T) {
 	summary := profileSummary(profile)
 
 	for _, want := range []string{
+		"Joystick: Automatic (auto)",
 		"HDD Image: /tmp/dos.img",
 		"HDD CHS: 512,63,16,142",
 	} {
@@ -98,6 +112,7 @@ func TestProfileSummaryIncludesFloppyDetails(t *testing.T) {
 	summary := profileSummary(profile)
 
 	for _, want := range []string{
+		"Joystick: Automatic (auto)",
 		"Floppy 1: /tmp/disk1.img",
 		"Floppy 2: /tmp/disk2.img",
 	} {
