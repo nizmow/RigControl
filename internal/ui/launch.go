@@ -41,3 +41,17 @@ func launchDOSBox(configPath string) error {
 	cmd := exec.Command(dosboxExecutable, "-conf", configPath)
 	return cmd.Start()
 }
+
+func launchProfile(profile machine.Profile, configPath string) error {
+	if _, err := os.Stat(dosboxExecutable); err != nil {
+		return fmt.Errorf("dosbox executable not found at %s: %w", dosboxExecutable, err)
+	}
+	if profile.HardDiskImage != "" {
+		if _, err := os.Stat(profile.HardDiskImage); err != nil {
+			return fmt.Errorf("hard disk image not found at %s: %w", profile.HardDiskImage, err)
+		}
+	}
+
+	cmd := exec.Command(dosboxExecutable, "-conf", configPath)
+	return cmd.Start()
+}

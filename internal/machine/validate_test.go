@@ -54,6 +54,13 @@ func TestValidateProfile(t *testing.T) {
 			wantErr: "joystick type is required",
 		},
 		{
+			name: "hard disk image without chs",
+			profile: withProfile(valid, func(p *Profile) {
+				p.HardDiskImage = "/tmp/disk.img"
+			}),
+			wantErr: "hard disk image and CHS geometry must both be set",
+		},
+		{
 			name:    "non-positive memory",
 			profile: withProfile(valid, func(p *Profile) { p.MemoryMB = 0 }),
 			wantErr: "memory must be a positive integer",

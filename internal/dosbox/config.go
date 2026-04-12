@@ -44,6 +44,9 @@ func Render(profile machine.Profile) string {
 		"ems": boolValue(profile.EMS),
 		"umb": boolValue(profile.UMB),
 	})
+	if autoexec := autoexecCommands(profile); len(autoexec) > 0 {
+		writeListSection(&builder, "autoexec", autoexec)
+	}
 
 	return strings.TrimSpace(builder.String()) + "\n"
 }
@@ -61,6 +64,24 @@ func writeSection(builder *strings.Builder, name string, values map[string]strin
 		builder.WriteString(fmt.Sprintf("%s=%s\n", key, value))
 	}
 	builder.WriteString("\n")
+}
+
+func writeListSection(builder *strings.Builder, name string, values []string) {
+	builder.WriteString("[" + name + "]\n")
+	for _, value := range values {
+		builder.WriteString(value + "\n")
+	}
+	builder.WriteString("\n")
+}
+
+func autoexecCommands(profile machine.Profile) []string {
+	if profile.HardDiskImage == "" {
+		return nil
+	}
+	return []string{
+		fmt.Sprintf(`imgmount 2 "%s" -t hdd -fs none -size %s`, profile.HardDiskImage, profile.HardDiskCHS),
+		"boot -l c",
+	}
 }
 
 func boolValue(enabled bool) string {

@@ -84,3 +84,33 @@ func TestRenderIncludesDisabledAndFalseValues(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderIncludesHardDiskAutoexecCommands(t *testing.T) {
+	profile := machine.Profile{
+		Name:          "Boot HDD",
+		CPUCore:       "auto",
+		CPUType:       "486",
+		Cycles:        "25000",
+		Machine:       "svga_s3",
+		MemoryMB:      16,
+		SoundBlaster:  "sb16",
+		HardDiskImage: "/tmp/dos.img",
+		HardDiskCHS:   "512,63,16,142",
+		JoystickType:  "auto",
+		XMS:           true,
+		EMS:           true,
+		UMB:           true,
+	}
+
+	rendered := Render(profile)
+
+	for _, want := range []string{
+		"[autoexec]",
+		`imgmount 2 "/tmp/dos.img" -t hdd -fs none -size 512,63,16,142`,
+		"boot -l c",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered config missing %q:\n%s", want, rendered)
+		}
+	}
+}

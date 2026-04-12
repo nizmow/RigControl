@@ -18,6 +18,12 @@ func profileSummary(profile machine.Profile) string {
 		fmt.Sprintf("GUS: %s", onOff(profile.GUS)),
 		fmt.Sprintf("XMS / EMS / UMB: %s / %s / %s", yesNo(profile.XMS), yesNo(profile.EMS), yesNo(profile.UMB)),
 	}
+	if profile.HardDiskImage != "" {
+		lines = append(lines,
+			fmt.Sprintf("HDD Image: %s", profile.HardDiskImage),
+			fmt.Sprintf("HDD CHS: %s", profile.HardDiskCHS),
+		)
+	}
 
 	return strings.Join(lines, "\n")
 }

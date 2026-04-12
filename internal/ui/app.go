@@ -144,7 +144,7 @@ func (ui *appUI) launchSelectedProfile() {
 		return
 	}
 
-	if err := launchDOSBox(configPath); err != nil {
+	if err := launchProfile(profile, configPath); err != nil {
 		dialog.ShowError(err, ui.window)
 		return
 	}

@@ -19,6 +19,9 @@ func ValidateProfile(profile Profile) error {
 	if strings.TrimSpace(profile.SoundBlaster) == "" {
 		return errors.New("sound blaster type is required")
 	}
+	if (strings.TrimSpace(profile.HardDiskImage) == "") != (strings.TrimSpace(profile.HardDiskCHS) == "") {
+		return errors.New("hard disk image and CHS geometry must both be set")
+	}
 	if strings.TrimSpace(profile.JoystickType) == "" {
 		return errors.New("joystick type is required")
 	}
