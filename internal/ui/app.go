@@ -2,11 +2,7 @@ package ui
 
 import (
 	"errors"
-	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -18,7 +14,16 @@ import (
 	"rigcontrol/internal/machine"
 )
 
-const dosboxExecutable = "/Applications/DOSBox Staging.app/Contents/MacOS/dosbox"
+type appUI struct {
+	window           fyne.Window
+	profiles         []machine.Profile
+	selectedIndex    int
+	list             *widget.List
+	nameLabel        *widget.Label
+	descriptionLabel *widget.Label
+	summaryLabel     *widget.Label
+	preview          *widget.Entry
+}
 
 func Run() error {
 	profiles := machine.Presets()
@@ -28,216 +33,136 @@ func Run() error {
 
 	fyneApp := app.NewWithID("com.nizmow.rigcontrol")
 	window := fyneApp.NewWindow("RigControl")
-	window.Resize(fyne.NewSize(980, 640))
+	window.Resize(fyne.NewSize(1080, 720))
 
-	selected := profiles[0]
-
-	nameEntry := widget.NewEntry()
-	descriptionEntry := widget.NewMultiLineEntry()
-	descriptionEntry.Wrapping = fyne.TextWrapWord
-	cpuCoreSelect := widget.NewSelect(machine.CPUCoreOptions, nil)
-	cpuTypeSelect := widget.NewSelect(machine.CPUTypeOptions, nil)
-	cyclesEntry := widget.NewEntry()
-	machineSelect := widget.NewSelect(machine.MachineOptions, nil)
-	memoryEntry := widget.NewEntry()
-	sbSelect := widget.NewSelect(machine.SoundBlasterOptions, nil)
-	gusCheck := widget.NewCheck("Gravis Ultrasound", nil)
-	joystickSelect := widget.NewSelect(machine.JoystickTypeOptions, nil)
-	xmsCheck := widget.NewCheck("XMS", nil)
-	emsCheck := widget.NewCheck("EMS", nil)
-	umbCheck := widget.NewCheck("UMB", nil)
-
-	preview := widget.NewMultiLineEntry()
-	preview.Wrapping = fyne.TextWrapOff
-	preview.Disable()
-
-	applyProfile := func(profile machine.Profile) {
-		selected = profile
-		nameEntry.SetText(profile.Name)
-		descriptionEntry.SetText(profile.Description)
-		cpuCoreSelect.SetSelected(profile.CPUCore)
-		cpuTypeSelect.SetSelected(profile.CPUType)
-		cyclesEntry.SetText(profile.Cycles)
-		machineSelect.SetSelected(profile.Machine)
-		memoryEntry.SetText(fmt.Sprintf("%d", profile.MemoryMB))
-		sbSelect.SetSelected(profile.SoundBlaster)
-		gusCheck.SetChecked(profile.GUS)
-		joystickSelect.SetSelected(profile.JoystickType)
-		xmsCheck.SetChecked(profile.XMS)
-		emsCheck.SetChecked(profile.EMS)
-		umbCheck.SetChecked(profile.UMB)
-		preview.SetText(dosbox.Render(profile))
-	}
-
-	buildProfile := func() (machine.Profile, error) {
-		profile := selected
-		profile.Name = strings.TrimSpace(nameEntry.Text)
-		profile.Description = strings.TrimSpace(descriptionEntry.Text)
-		profile.CPUCore = strings.TrimSpace(cpuCoreSelect.Selected)
-		profile.CPUType = strings.TrimSpace(cpuTypeSelect.Selected)
-		profile.Cycles = strings.TrimSpace(cyclesEntry.Text)
-		profile.Machine = strings.TrimSpace(machineSelect.Selected)
-		profile.SoundBlaster = strings.TrimSpace(sbSelect.Selected)
-		profile.GUS = gusCheck.Checked
-		profile.JoystickType = strings.TrimSpace(joystickSelect.Selected)
-		profile.XMS = xmsCheck.Checked
-		profile.EMS = emsCheck.Checked
-		profile.UMB = umbCheck.Checked
-
-		if profile.Name == "" {
-			return machine.Profile{}, errors.New("profile name is required")
-		}
-		if profile.CPUCore == "" || profile.CPUType == "" || profile.Cycles == "" {
-			return machine.Profile{}, errors.New("cpu settings are required")
-		}
-		if profile.Machine == "" {
-			return machine.Profile{}, errors.New("video machine is required")
-		}
-		if profile.SoundBlaster == "" {
-			return machine.Profile{}, errors.New("sound blaster type is required")
-		}
-		if profile.JoystickType == "" {
-			return machine.Profile{}, errors.New("joystick type is required")
-		}
-
-		var memoryMB int
-		if _, err := fmt.Sscanf(strings.TrimSpace(memoryEntry.Text), "%d", &memoryMB); err != nil || memoryMB <= 0 {
-			return machine.Profile{}, errors.New("memory must be a positive integer")
-		}
-		profile.MemoryMB = memoryMB
-
-		return profile, nil
-	}
-
-	refreshPreview := func() {
-		profile, err := buildProfile()
-		if err != nil {
-			preview.SetText("# " + err.Error())
-			return
-		}
-		selected = profile
-		preview.SetText(dosbox.Render(profile))
-	}
-
-	presetNames := make([]string, 0, len(profiles))
-	for _, profile := range profiles {
-		presetNames = append(presetNames, profile.Name)
-	}
-
-	presetSelect := widget.NewSelect(presetNames, func(name string) {
-		profile, ok := machine.ByName(name)
-		if !ok {
-			return
-		}
-		applyProfile(profile)
-	})
-
-	for _, field := range []*widget.Entry{nameEntry, descriptionEntry, cyclesEntry, memoryEntry} {
-		field.OnChanged = func(string) {
-			refreshPreview()
-		}
-	}
-	for _, selectWidget := range []*widget.Select{cpuCoreSelect, cpuTypeSelect, machineSelect, sbSelect, joystickSelect} {
-		selectWidget.OnChanged = func(string) {
-			refreshPreview()
-		}
-	}
-	for _, check := range []*widget.Check{gusCheck, xmsCheck, emsCheck, umbCheck} {
-		check.OnChanged = func(bool) {
-			refreshPreview()
-		}
-	}
-
-	launchButton := widget.NewButton("Launch DOSBox", func() {
-		profile, err := buildProfile()
-		if err != nil {
-			dialog.ShowError(err, window)
-			return
-		}
-
-		configPath, err := writeTempConfig(profile)
-		if err != nil {
-			dialog.ShowError(err, window)
-			return
-		}
-
-		if err := launchDOSBox(configPath); err != nil {
-			dialog.ShowError(err, window)
-			return
-		}
-
-		dialog.ShowInformation("DOSBox Started", "Launched DOSBox Staging with "+filepath.Base(configPath), window)
-	})
-
-	form := widget.NewForm(
-		widget.NewFormItem("Preset", presetSelect),
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Description", descriptionEntry),
-		widget.NewFormItem("CPU Core", cpuCoreSelect),
-		widget.NewFormItem("CPU Type", cpuTypeSelect),
-		widget.NewFormItem("Cycles", cyclesEntry),
-		widget.NewFormItem("Video", machineSelect),
-		widget.NewFormItem("Memory (MB)", memoryEntry),
-		widget.NewFormItem("Sound", sbSelect),
-		widget.NewFormItem("Joystick", joystickSelect),
-	)
-
-	formPanel := container.NewBorder(
-		nil,
-		container.NewHBox(launchButton),
-		nil,
-		nil,
-		container.NewVBox(
-			form,
-			gusCheck,
-			xmsCheck,
-			emsCheck,
-			umbCheck,
-		),
-	)
-
-	previewPanel := container.NewBorder(
-		widget.NewLabel("DOSBox Staging config preview"),
-		nil,
-		nil,
-		nil,
-		container.NewStack(preview),
-	)
-
-	window.SetContent(container.NewHSplit(formPanel, previewPanel))
-	applyProfile(selected)
-	presetSelect.SetSelected(selected.Name)
+	ui := newAppUI(window, profiles)
+	window.SetContent(ui.content())
+	ui.list.Select(0)
 	window.ShowAndRun()
 
 	return nil
 }
 
-func writeTempConfig(profile machine.Profile) (string, error) {
-	slug := strings.ToLower(profile.Name)
-	slug = strings.ReplaceAll(slug, " ", "-")
-	slug = strings.ReplaceAll(slug, "/", "-")
-	if slug == "" {
-		slug = "rigcontrol"
+func newAppUI(window fyne.Window, profiles []machine.Profile) *appUI {
+	ui := &appUI{
+		window:           window,
+		profiles:         profiles,
+		selectedIndex:    0,
+		nameLabel:        widget.NewLabel(""),
+		descriptionLabel: widget.NewLabel(""),
+		summaryLabel:     widget.NewLabel(""),
+		preview:          widget.NewMultiLineEntry(),
 	}
 
-	file, err := os.CreateTemp("", slug+"-*.conf")
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
+	ui.nameLabel.TextStyle = fyne.TextStyle{Bold: true}
+	ui.descriptionLabel.Wrapping = fyne.TextWrapWord
+	ui.summaryLabel.Wrapping = fyne.TextWrapWord
+	ui.preview.Wrapping = fyne.TextWrapOff
+	ui.preview.Disable()
 
-	if _, err := file.WriteString(dosbox.Render(profile)); err != nil {
-		return "", err
-	}
+	ui.list = widget.NewList(
+		func() int { return len(ui.profiles) },
+		func() fyne.CanvasObject {
+			return widget.NewLabel("template")
+		},
+		func(id widget.ListItemID, obj fyne.CanvasObject) {
+			obj.(*widget.Label).SetText(ui.profiles[id].Name)
+		},
+	)
+	ui.list.OnSelected = ui.selectProfile
 
-	return file.Name(), nil
+	return ui
 }
 
-func launchDOSBox(configPath string) error {
-	if _, err := os.Stat(dosboxExecutable); err != nil {
-		return fmt.Errorf("dosbox executable not found at %s: %w", dosboxExecutable, err)
+func (ui *appUI) content() fyne.CanvasObject {
+	editButton := widget.NewButton("Edit Machine", func() {
+		showProfileEditor(ui.window, ui.selectedProfile(), func(updated machine.Profile) {
+			ui.profiles[ui.selectedIndex] = updated
+			ui.list.Refresh()
+			ui.selectProfile(ui.selectedIndex)
+		})
+	})
+
+	launchButton := widget.NewButton("Launch DOSBox", func() {
+		profile := ui.selectedProfile()
+		if err := machine.ValidateProfile(profile); err != nil {
+			dialog.ShowError(err, ui.window)
+			return
+		}
+
+		configPath, err := writeTempConfig(profile)
+		if err != nil {
+			dialog.ShowError(err, ui.window)
+			return
+		}
+
+		if err := launchDOSBox(configPath); err != nil {
+			dialog.ShowError(err, ui.window)
+			return
+		}
+
+		dialog.ShowInformation("DOSBox Started", "Launched DOSBox Staging with "+filepath.Base(configPath), ui.window)
+	})
+
+	leftPane := container.NewBorder(
+		widget.NewLabel("Machine Types"),
+		nil,
+		nil,
+		nil,
+		ui.list,
+	)
+
+	summaryPane := container.NewVBox(
+		ui.nameLabel,
+		ui.descriptionLabel,
+		widget.NewSeparator(),
+		widget.NewLabel("Configuration Summary"),
+		ui.summaryLabel,
+	)
+
+	actions := container.NewHBox(editButton, launchButton)
+
+	rightPane := container.NewBorder(
+		nil,
+		actions,
+		nil,
+		nil,
+		func() *container.Split {
+			split := container.NewVSplit(
+				container.NewPadded(summaryPane),
+				container.NewBorder(
+					widget.NewLabel("DOSBox Config Preview"),
+					nil,
+					nil,
+					nil,
+					ui.preview,
+				),
+			)
+			split.SetOffset(0.42)
+			return split
+		}(),
+	)
+
+	split := container.NewHSplit(container.NewPadded(leftPane), container.NewPadded(rightPane))
+	split.SetOffset(0.28)
+
+	return split
+}
+
+func (ui *appUI) selectedProfile() machine.Profile {
+	return ui.profiles[ui.selectedIndex]
+}
+
+func (ui *appUI) selectProfile(id widget.ListItemID) {
+	if id < 0 || id >= len(ui.profiles) {
+		return
 	}
 
-	cmd := exec.Command(dosboxExecutable, "-conf", configPath)
-	return cmd.Start()
+	ui.selectedIndex = id
+	profile := ui.selectedProfile()
+
+	ui.nameLabel.SetText(profile.Name)
+	ui.descriptionLabel.SetText(profile.Description)
+	ui.summaryLabel.SetText(profileSummary(profile))
+	ui.preview.SetText(dosbox.Render(profile))
 }

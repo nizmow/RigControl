@@ -15,3 +15,7 @@ mise install
 mise run tidy
 mise run run
 ```
+
+## Project Notes
+
+- Future handoff and architecture notes live in [docs/agent-handoff.md](/Users/nizmow/Code/RigControl/docs/agent-handoff.md).
