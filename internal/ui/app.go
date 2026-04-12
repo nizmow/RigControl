@@ -1,10 +1,11 @@
 package ui
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -16,6 +17,8 @@ import (
 	"rigcontrol/internal/dosbox"
 	"rigcontrol/internal/machine"
 )
+
+const dosboxExecutable = "/Applications/DOSBox Staging.app/Contents/MacOS/dosbox"
 
 func Run() error {
 	profiles := machine.Presets()
@@ -137,55 +140,25 @@ func Run() error {
 		}
 	}
 
-	saveJSON := widget.NewButton("Save Profile JSON", func() {
+	launchButton := widget.NewButton("Launch DOSBox", func() {
 		profile, err := buildProfile()
 		if err != nil {
 			dialog.ShowError(err, window)
 			return
 		}
 
-		dialog.ShowFileSave(func(writer fyne.URIWriteCloser, err error) {
-			if err != nil {
-				dialog.ShowError(err, window)
-				return
-			}
-			if writer == nil {
-				return
-			}
-			defer writer.Close()
-
-			payload, err := json.MarshalIndent(profile, "", "  ")
-			if err != nil {
-				dialog.ShowError(err, window)
-				return
-			}
-			if _, err := writer.Write(append(payload, '\n')); err != nil {
-				dialog.ShowError(err, window)
-			}
-		}, window)
-	})
-
-	saveConfig := widget.NewButton("Export DOSBox Config", func() {
-		profile, err := buildProfile()
+		configPath, err := writeTempConfig(profile)
 		if err != nil {
 			dialog.ShowError(err, window)
 			return
 		}
 
-		dialog.ShowFileSave(func(writer fyne.URIWriteCloser, err error) {
-			if err != nil {
-				dialog.ShowError(err, window)
-				return
-			}
-			if writer == nil {
-				return
-			}
-			defer writer.Close()
+		if err := launchDOSBox(configPath); err != nil {
+			dialog.ShowError(err, window)
+			return
+		}
 
-			if _, err := io.WriteString(writer, dosbox.Render(profile)); err != nil {
-				dialog.ShowError(err, window)
-			}
-		}, window)
+		dialog.ShowInformation("DOSBox Started", "Launched DOSBox Staging with "+filepath.Base(configPath), window)
 	})
 
 	form := widget.NewForm(
@@ -202,7 +175,7 @@ func Run() error {
 
 	formPanel := container.NewBorder(
 		nil,
-		container.NewHBox(saveJSON, saveConfig),
+		container.NewHBox(launchButton),
 		nil,
 		nil,
 		container.NewVBox(
@@ -229,4 +202,34 @@ func Run() error {
 	window.ShowAndRun()
 
 	return nil
+}
+
+func writeTempConfig(profile machine.Profile) (string, error) {
+	slug := strings.ToLower(profile.Name)
+	slug = strings.ReplaceAll(slug, " ", "-")
+	slug = strings.ReplaceAll(slug, "/", "-")
+	if slug == "" {
+		slug = "rigcontrol"
+	}
+
+	file, err := os.CreateTemp("", slug+"-*.conf")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(dosbox.Render(profile)); err != nil {
+		return "", err
+	}
+
+	return file.Name(), nil
+}
+
+func launchDOSBox(configPath string) error {
+	if _, err := os.Stat(dosboxExecutable); err != nil {
+		return fmt.Errorf("dosbox executable not found at %s: %w", dosboxExecutable, err)
+	}
+
+	cmd := exec.Command(dosboxExecutable, "-conf", configPath)
+	return cmd.Start()
 }
