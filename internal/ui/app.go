@@ -25,10 +25,9 @@ type appUI struct {
 	preview          *widget.Entry
 }
 
-func Run() error {
-	profiles := machine.Presets()
+func RunWithProfiles(profiles []machine.Profile) error {
 	if len(profiles) == 0 {
-		return errors.New("no machine presets available")
+		return errors.New("no machine profiles available")
 	}
 
 	fyneApp := app.NewWithID("com.nizmow.rigcontrol")

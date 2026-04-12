@@ -1,0 +1,49 @@
+{
+  "profiles": [
+    {
+      "name": "286 EGA",
+      "description": "Low-end late 80s setup for EGA adventure and strategy titles.",
+      "cpu_core": "normal",
+      "cpu_type": "386",
+      "cycles": "1200",
+      "machine": "ega",
+      "memory_mb": 2,
+      "sound_blaster": "sb1",
+      "gus": false,
+      "joystick_type": "disabled",
+      "xms": false,
+      "ems": true,
+      "umb": true
+    },
+    {
+      "name": "486 SVGA",
+      "description": "Balanced early 90s machine for VGA DOS games with Sound Blaster 16.",
+      "cpu_core": "auto",
+      "cpu_type": "486",
+      "cycles": "25000",
+      "machine": "svga_s3",
+      "memory_mb": 16,
+      "sound_blaster": "sb16",
+      "gus": false,
+      "joystick_type": "auto",
+      "xms": true,
+      "ems": true,
+      "umb": true
+    },
+    {
+      "name": "Fast Pentium",
+      "description": "High-end DOS setup for demanding SVGA and Build engine games.",
+      "cpu_core": "dynamic",
+      "cpu_type": "pentium",
+      "cycles": "50000",
+      "machine": "svga_s3",
+      "memory_mb": 32,
+      "sound_blaster": "sb16",
+      "gus": true,
+      "joystick_type": "auto",
+      "xms": true,
+      "ems": true,
+      "umb": true
+    }
+  ]
+}

@@ -6,7 +6,7 @@ RigControl is a Go/Fyne desktop app that builds DOSBox Staging machine configs f
 
 Current product shape:
 
-- Pick a preset machine profile.
+- Load machine profiles from JSON.
 - Edit the profile in the UI.
 - Preview the generated DOSBox config.
 - Launch DOSBox Staging with a temporary config file.
@@ -22,7 +22,8 @@ Core packages:
 
 - [internal/ui/app.go](/Users/nizmow/Code/RigControl/internal/ui/app.go): main Fyne window, form controls, preview, and launch flow.
 - [internal/machine/profile.go](/Users/nizmow/Code/RigControl/internal/machine/profile.go): machine profile model used by the UI and config renderer.
-- [internal/machine/presets.go](/Users/nizmow/Code/RigControl/internal/machine/presets.go): built-in starter presets.
+- [internal/machine/store.go](/Users/nizmow/Code/RigControl/internal/machine/store.go): machine config file loading and validation.
+- [machines.json](/Users/nizmow/Code/RigControl/machines.json): checked-in development machine set.
 - [internal/machine/options_generated.go](/Users/nizmow/Code/RigControl/internal/machine/options_generated.go): generated option lists for bounded DOSBox settings.
 - [internal/dosbox/config.go](/Users/nizmow/Code/RigControl/internal/dosbox/config.go): DOSBox config rendering.
 - [internal/dosbox/config_test.go](/Users/nizmow/Code/RigControl/internal/dosbox/config_test.go): basic renderer regression coverage.
@@ -43,6 +44,20 @@ Launch flow:
 Current limitation:
 
 - The executable path is not yet configurable.
+- Saving machine profiles is not implemented yet.
+
+## Machine Config Loading
+
+Default path:
+
+- macOS: `/Users/nizmow/Library/Application Support/RigControl/machines.json`
+
+Startup behavior:
+
+- `cmd/rigcontrol` accepts `--machines-config /path/to/machines.json`.
+- If no override is provided, it uses the OS config location.
+- In-repo development should prefer `mise run run`, which passes the checked-in repo `machines.json`.
+- The app no longer falls back to built-in presets in code if the JSON file is missing.
 
 ## Option Regeneration
 
@@ -79,7 +94,8 @@ Use `mise` tasks by default:
 - Launching DOSBox with the current config matters more than exporting files.
 - The UI uses dropdowns only for settings that have documented bounded values.
 - `cpu_cycles` remains free-form because DOSBox accepts numeric values and `max`.
-- Presets are static starter templates, not persisted user data.
+- Machine definitions are JSON-backed and loaded at startup.
+- Saving profiles is not implemented yet.
 
 ## Obvious Next Steps
 

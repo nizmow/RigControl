@@ -3,7 +3,7 @@ go = "1.26.0"
 
 [tasks.run]
 description = "Run RigControl"
-run = "go run ./cmd/rigcontrol"
+run = "go run ./cmd/rigcontrol --machines-config ./machines.json"
 
 [tasks.build]
 description = "Build RigControl"
