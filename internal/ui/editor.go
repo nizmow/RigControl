@@ -10,7 +10,11 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	fynetooltip "github.com/dweymouth/fyne-tooltip"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 
 	"rigcontrol/internal/machine"
 )
@@ -35,6 +39,7 @@ type profileForm struct {
 	cpuCore           *widget.Select
 	cpuType           *widget.Select
 	cycles            *widget.Entry
+	fixedCycles       *widget.Check
 	videoMachine      *widget.Select
 	memoryMB          *widget.Entry
 	soundBlaster      *widget.Select
@@ -73,7 +78,9 @@ func newProfileEditor(profile machine.Profile, onSave func(machine.Profile) erro
 	}
 
 	editor.window.Resize(initialEditorWindowSize(fyne.CurrentApp()))
-	editor.window.SetContent(container.NewPadded(editor.content()))
+	fynetooltip.SetToolTipTextSizeName(theme.SizeNameText)
+	content := container.NewPadded(editor.content())
+	editor.window.SetContent(fynetooltip.AddWindowToolTipLayer(content, editor.window.Canvas()))
 	editor.window.CenterOnScreen()
 
 	return editor
@@ -84,21 +91,20 @@ func (e *profileEditor) content() fyne.CanvasObject {
 	cancelButton := widget.NewButton("Cancel", func() {
 		e.window.Close()
 	})
-	body := container.NewVScroll(container.NewVBox(
-		e.errorLabel,
-		e.form.widget(e.window),
-		e.form.gus,
-		e.form.xms,
-		e.form.ems,
-		e.form.umb,
-	))
+
+	tabs := container.NewAppTabs(
+		container.NewTabItem("General", e.form.generalTab()),
+		container.NewTabItem("Hardware", e.form.hardwareTab()),
+		container.NewTabItem("Storage", e.form.storageTab(e.window)),
+		container.NewTabItem("Audio & Input", e.form.audioInputTab()),
+	)
 
 	return container.NewBorder(
-		nil,
+		e.errorLabel,
 		container.NewHBox(cancelButton, saveButton),
 		nil,
 		nil,
-		body,
+		tabs,
 	)
 }
 
@@ -130,6 +136,7 @@ func newProfileForm(profile machine.Profile) *profileForm {
 		cpuCore:           widget.NewSelect(machine.CPUCoreOptions, nil),
 		cpuType:           widget.NewSelect(machine.CPUTypeOptions, nil),
 		cycles:            widget.NewEntry(),
+		fixedCycles:       widget.NewCheck("Fixed", nil),
 		videoMachine:      widget.NewSelect(machine.MachineOptions, nil),
 		memoryMB:          widget.NewEntry(),
 		soundBlaster:      widget.NewSelect(machine.SoundBlasterOptions, nil),
@@ -172,7 +179,25 @@ func newProfileForm(profile machine.Profile) *profileForm {
 	return form
 }
 
-func (f *profileForm) widget(window fyne.Window) fyne.CanvasObject {
+func (f *profileForm) generalTab() fyne.CanvasObject {
+	return container.NewVScroll(container.NewPadded(widget.NewForm(
+		widget.NewFormItem("Name", f.name),
+		widget.NewFormItem("Description", f.description),
+	)))
+}
+
+func (f *profileForm) hardwareTab() fyne.CanvasObject {
+	return container.NewVScroll(container.NewPadded(widget.NewForm(
+		widget.NewFormItem("CPU Core", f.cpuCore),
+		widget.NewFormItem("CPU Type", f.cpuType),
+		widget.NewFormItem("Cycles", container.NewBorder(nil, nil, nil, f.fixedCycles, f.cycles)),
+		widget.NewFormItem("Video", f.videoMachine),
+		widget.NewFormItem("Memory (MB)", f.memoryMB),
+		widget.NewFormItem("DOS Memory", container.NewVBox(f.xms, f.ems, f.umb)),
+	)))
+}
+
+func (f *profileForm) storageTab(window fyne.Window) fyne.CanvasObject {
 	browseButton := widget.NewButton("Browse...", func() {
 		f.pickHardDiskImage(window)
 	})
@@ -185,22 +210,21 @@ func (f *profileForm) widget(window fyne.Window) fyne.CanvasObject {
 		f.hardDiskCHS.SetText(chs)
 	})
 
-	return widget.NewForm(
-		widget.NewFormItem("Name", f.name),
-		widget.NewFormItem("Description", f.description),
-		widget.NewFormItem("CPU Core", f.cpuCore),
-		widget.NewFormItem("CPU Type", f.cpuType),
-		widget.NewFormItem("Cycles", f.cycles),
-		widget.NewFormItem("Video", f.videoMachine),
-		widget.NewFormItem("Memory (MB)", f.memoryMB),
-		widget.NewFormItem("Sound", f.soundBlaster),
-		widget.NewFormItem("Mouse Capture", fieldWithHelp(f.mouseCapture, "How DOSBox grabs or releases the mouse in the host window.")),
-		widget.NewFormItem("Mouse", fieldWithHelp(container.NewVBox(f.mouseRawInput, f.dosMouseImmediate), "Raw input bypasses host acceleration while captured. Immediate updates can help some action games but may over-accelerate others.")),
+	return container.NewVScroll(container.NewPadded(widget.NewForm(
 		widget.NewFormItem("Floppy Disks", f.buildFloppyEditor(window)),
 		widget.NewFormItem("HDD Image", container.NewBorder(nil, nil, nil, browseButton, f.hardDiskImage)),
 		widget.NewFormItem("HDD CHS", fieldWithHelp(container.NewBorder(nil, nil, nil, autoFillCHSButton, f.hardDiskCHS), "Cylinder-head-sector geometry used for HDD image booting. Auto-fill works for images sized as 512-byte sectors, 63 sectors/track, 16 heads.")),
+	)))
+}
+
+func (f *profileForm) audioInputTab() fyne.CanvasObject {
+	return container.NewVScroll(container.NewPadded(widget.NewForm(
+		widget.NewFormItem("Sound", f.soundBlaster),
+		widget.NewFormItem("GUS", f.gus),
 		widget.NewFormItem("Joystick", f.joystickType),
-	)
+		widget.NewFormItem("Mouse Capture", fieldWithHelp(f.mouseCapture, "How DOSBox grabs or releases the mouse in the host window.")),
+		widget.NewFormItem("Mouse Options", fieldWithHelp(container.NewVBox(f.mouseRawInput, f.dosMouseImmediate), "Raw input bypasses host acceleration while captured. Immediate updates can help some action games but may over-accelerate others.")),
+	)))
 }
 
 func (f *profileForm) buildFloppyEditor(window fyne.Window) fyne.CanvasObject {
@@ -217,14 +241,41 @@ func (f *profileForm) buildFloppyEditor(window fyne.Window) fyne.CanvasObject {
 	)
 }
 
+type helpIcon struct {
+	ttwidget.ToolTipWidget
+	icon *widget.Icon
+}
+
+func newHelpIcon(helpText string) *helpIcon {
+	h := &helpIcon{
+		icon: widget.NewIcon(theme.QuestionIcon()),
+	}
+	h.SetToolTip(helpText)
+	h.ExtendBaseWidget(h)
+	return h
+}
+
+func (h *helpIcon) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(h.icon)
+}
+
+func (h *helpIcon) MinSize() fyne.Size {
+	return h.icon.MinSize()
+}
+
+func (h *helpIcon) Resize(s fyne.Size) {
+	h.BaseWidget.Resize(s)
+	h.icon.Resize(s)
+}
+
 func fieldWithHelp(field fyne.CanvasObject, help string) fyne.CanvasObject {
 	if strings.TrimSpace(help) == "" {
 		return field
 	}
-	hint := widget.NewLabel(help)
-	hint.Wrapping = fyne.TextWrapWord
-	hint.Importance = widget.LowImportance
-	return container.NewVBox(field, hint)
+
+	// Use Border layout to keep the icon on the right, and wrap it in a VBox
+	// so it stays at the top of the container height instead of centering.
+	return container.NewBorder(nil, nil, nil, container.NewVBox(newHelpIcon(help)), field)
 }
 
 func (f *profileForm) setProfile(profile machine.Profile) {
@@ -233,6 +284,7 @@ func (f *profileForm) setProfile(profile machine.Profile) {
 	f.cpuCore.SetSelected(profile.CPUCore)
 	f.cpuType.SetSelected(profile.CPUType)
 	f.cycles.SetText(profile.Cycles)
+	f.fixedCycles.SetChecked(profile.FixedCycles)
 	f.videoMachine.SetSelected(profile.Machine)
 	f.memoryMB.SetText(fmt.Sprintf("%d", profile.MemoryMB))
 	f.soundBlaster.SetSelected(profile.SoundBlaster)
@@ -260,6 +312,7 @@ func (f *profileForm) profile() (machine.Profile, error) {
 		CPUCore:           strings.TrimSpace(f.cpuCore.Selected),
 		CPUType:           strings.TrimSpace(f.cpuType.Selected),
 		Cycles:            strings.TrimSpace(f.cycles.Text),
+		FixedCycles:       f.fixedCycles.Checked,
 		Machine:           strings.TrimSpace(f.videoMachine.Selected),
 		SoundBlaster:      strings.TrimSpace(f.soundBlaster.Selected),
 		MouseCapture:      strings.TrimSpace(f.mouseCapture.Selected),

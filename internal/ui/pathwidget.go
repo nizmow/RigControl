@@ -1,25 +1,21 @@
 package ui
 
 import (
-	"math"
 	"path/filepath"
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 )
 
 type pathValueLabel struct {
-	widget.BaseWidget
+	ttwidget.ToolTipWidget
 	fullText string
 	label    *widget.Label
-	tooltip  *widget.PopUp
 }
-
-var _ desktop.Hoverable = (*pathValueLabel)(nil)
 
 func newPathValueLabel(text string) *pathValueLabel {
 	p := &pathValueLabel{
@@ -51,20 +47,6 @@ func (p *pathValueLabel) SetText(text string) {
 	p.refreshDisplay()
 }
 
-func (p *pathValueLabel) MouseIn(*desktop.MouseEvent) {
-	p.showTooltip()
-}
-
-func (p *pathValueLabel) MouseMoved(*desktop.MouseEvent) {
-}
-
-func (p *pathValueLabel) MouseOut() {
-	if p.tooltip != nil {
-		p.tooltip.Hide()
-		p.tooltip = nil
-	}
-}
-
 func (p *pathValueLabel) refreshDisplay() {
 	if p.label == nil {
 		return
@@ -72,36 +54,18 @@ func (p *pathValueLabel) refreshDisplay() {
 	width := p.Size().Width
 	if width <= 0 {
 		p.label.SetText(p.fullText)
+		p.SetToolTip("")
 		return
 	}
-	p.label.SetText(truncatePathText(p.fullText, width, theme.TextSize(), fyne.TextStyle{}))
-}
+	displayText := truncatePathText(p.fullText, width, theme.TextSize(), fyne.TextStyle{})
+	p.label.SetText(displayText)
 
-func (p *pathValueLabel) showTooltip() {
-	if p.fullText == "" || p.label.Text == p.fullText {
-		return
+	// Only show tooltip if text was truncated
+	if displayText != p.fullText {
+		p.SetToolTip(p.fullText)
+	} else {
+		p.SetToolTip("")
 	}
-	canvas := fyne.CurrentApp().Driver().CanvasForObject(p)
-	if canvas == nil {
-		return
-	}
-	if p.tooltip != nil {
-		p.tooltip.Hide()
-	}
-
-	full := widget.NewLabel(p.fullText)
-	full.Wrapping = fyne.TextWrapBreak
-	content := container.NewPadded(full)
-	p.tooltip = widget.NewPopUp(content, canvas)
-	padding := theme.Padding() * 6
-	textWidth := fyne.MeasureText(p.fullText, theme.TextSize(), fyne.TextStyle{}).Width
-	maxWidth := canvas.Size().Width - theme.Padding()*8
-	if maxWidth < 200 {
-		maxWidth = 200
-	}
-	width := float32(math.Min(float64(maxWidth), math.Max(360, float64(textWidth+padding))))
-	p.tooltip.Resize(fyne.NewSize(width, content.MinSize().Height))
-	p.tooltip.ShowAtRelativePosition(fyne.NewPos(0, p.Size().Height), p)
 }
 
 func truncatePathText(text string, maxWidth, textSize float32, style fyne.TextStyle) string {

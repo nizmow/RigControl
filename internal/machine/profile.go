@@ -6,6 +6,7 @@ type Profile struct {
 	CPUCore           string   `json:"cpu_core"`
 	CPUType           string   `json:"cpu_type"`
 	Cycles            string   `json:"cycles"`
+	FixedCycles       bool     `json:"fixed_cycles"`
 	Machine           string   `json:"machine"`
 	MemoryMB          int      `json:"memory_mb"`
 	SoundBlaster      string   `json:"sound_blaster"`

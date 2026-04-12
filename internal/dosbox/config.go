@@ -18,7 +18,7 @@ func Render(profile machine.Profile) string {
 	writeSection(&builder, "cpu", map[string]string{
 		"core":       profile.CPUCore,
 		"cputype":    profile.CPUType,
-		"cpu_cycles": profile.Cycles,
+		"cpu_cycles": renderCycles(profile),
 	})
 	writeSection(&builder, "mixer", map[string]string{
 		"rate":      "44100",
@@ -54,6 +54,14 @@ func Render(profile machine.Profile) string {
 	}
 
 	return strings.TrimSpace(builder.String()) + "\n"
+}
+
+func renderCycles(profile machine.Profile) string {
+	cycles := strings.TrimSpace(profile.Cycles)
+	if profile.FixedCycles && cycles != "auto" && cycles != "max" && !strings.HasPrefix(cycles, "fixed ") {
+		return "fixed " + cycles
+	}
+	return cycles
 }
 
 func writeSection(builder *strings.Builder, name string, values map[string]string) {

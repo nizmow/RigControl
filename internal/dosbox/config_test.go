@@ -158,3 +158,29 @@ func TestRenderIncludesFloppySwapMountCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderHandlesFixedCyclesPrefix(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		cycles      string
+		fixedCycles bool
+		want        string
+	}{
+		{"fixed value", "3000", true, "cpu_cycles=fixed 3000"},
+		{"auto with fixed true", "auto", true, "cpu_cycles=auto"},
+		{"max with fixed true", "max", true, "cpu_cycles=max"},
+		{"already has fixed prefix", "fixed 5000", true, "cpu_cycles=fixed 5000"},
+		{"not fixed", "3000", false, "cpu_cycles=3000"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := machine.Profile{
+				Cycles:      tt.cycles,
+				FixedCycles: tt.fixedCycles,
+			}
+			rendered := Render(profile)
+			if !strings.Contains(rendered, tt.want) {
+				t.Errorf("Render() missing %q, got:\n%s", tt.want, rendered)
+			}
+		})
+	}
+}

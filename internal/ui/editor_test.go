@@ -185,6 +185,27 @@ func TestUpdateFloppyListRowUsesExpectedWidgetShape(t *testing.T) {
 	}
 }
 
+func TestProfileFormRoundTripsFixedCycles(t *testing.T) {
+	test.NewApp()
+
+	profile := newTestProfile()
+	profile.Cycles = "3000"
+	profile.FixedCycles = true
+
+	form := newProfileForm(profile)
+	got, err := form.profile()
+	if err != nil {
+		t.Fatalf("form.profile() error = %v", err)
+	}
+
+	if got.Cycles != "3000" {
+		t.Fatalf("Cycles = %q, want %q", got.Cycles, "3000")
+	}
+	if got.FixedCycles != true {
+		t.Fatalf("FixedCycles = %v, want true", got.FixedCycles)
+	}
+}
+
 func newTestProfile() machine.Profile {
 	return machine.NewProfile()
 }
