@@ -9,9 +9,21 @@ run = "go run ./cmd/rigcontrol"
 description = "Build RigControl"
 run = "go build ./cmd/rigcontrol"
 
+[tasks.format]
+description = "Format Go source"
+run = "gofmt -w ./cmd ./internal"
+
+[tasks.generate-options]
+description = "Regenerate DOSBox option enums from the installed DOSBox Staging config"
+run = "go run ./cmd/generate-options"
+
 [tasks.test]
 description = "Run tests"
 run = "go test ./..."
+
+[tasks.check]
+description = "Format and test the project"
+depends = ["format", "test"]
 
 [tasks.tidy]
 description = "Sync Go module dependencies"

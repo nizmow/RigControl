@@ -35,14 +35,14 @@ func Run() error {
 	nameEntry := widget.NewEntry()
 	descriptionEntry := widget.NewMultiLineEntry()
 	descriptionEntry.Wrapping = fyne.TextWrapWord
-	cpuCoreEntry := widget.NewEntry()
-	cpuTypeEntry := widget.NewEntry()
+	cpuCoreSelect := widget.NewSelect(machine.CPUCoreOptions, nil)
+	cpuTypeSelect := widget.NewSelect(machine.CPUTypeOptions, nil)
 	cyclesEntry := widget.NewEntry()
-	machineEntry := widget.NewEntry()
+	machineSelect := widget.NewSelect(machine.MachineOptions, nil)
 	memoryEntry := widget.NewEntry()
-	sbEntry := widget.NewEntry()
+	sbSelect := widget.NewSelect(machine.SoundBlasterOptions, nil)
 	gusCheck := widget.NewCheck("Gravis Ultrasound", nil)
-	joystickCheck := widget.NewCheck("Joystick enabled", nil)
+	joystickSelect := widget.NewSelect(machine.JoystickTypeOptions, nil)
 	xmsCheck := widget.NewCheck("XMS", nil)
 	emsCheck := widget.NewCheck("EMS", nil)
 	umbCheck := widget.NewCheck("UMB", nil)
@@ -55,14 +55,14 @@ func Run() error {
 		selected = profile
 		nameEntry.SetText(profile.Name)
 		descriptionEntry.SetText(profile.Description)
-		cpuCoreEntry.SetText(profile.CPUCore)
-		cpuTypeEntry.SetText(profile.CPUType)
+		cpuCoreSelect.SetSelected(profile.CPUCore)
+		cpuTypeSelect.SetSelected(profile.CPUType)
 		cyclesEntry.SetText(profile.Cycles)
-		machineEntry.SetText(profile.Machine)
+		machineSelect.SetSelected(profile.Machine)
 		memoryEntry.SetText(fmt.Sprintf("%d", profile.MemoryMB))
-		sbEntry.SetText(profile.SoundBlaster)
+		sbSelect.SetSelected(profile.SoundBlaster)
 		gusCheck.SetChecked(profile.GUS)
-		joystickCheck.SetChecked(profile.Joystick)
+		joystickSelect.SetSelected(profile.JoystickType)
 		xmsCheck.SetChecked(profile.XMS)
 		emsCheck.SetChecked(profile.EMS)
 		umbCheck.SetChecked(profile.UMB)
@@ -73,13 +73,13 @@ func Run() error {
 		profile := selected
 		profile.Name = strings.TrimSpace(nameEntry.Text)
 		profile.Description = strings.TrimSpace(descriptionEntry.Text)
-		profile.CPUCore = strings.TrimSpace(cpuCoreEntry.Text)
-		profile.CPUType = strings.TrimSpace(cpuTypeEntry.Text)
+		profile.CPUCore = strings.TrimSpace(cpuCoreSelect.Selected)
+		profile.CPUType = strings.TrimSpace(cpuTypeSelect.Selected)
 		profile.Cycles = strings.TrimSpace(cyclesEntry.Text)
-		profile.Machine = strings.TrimSpace(machineEntry.Text)
-		profile.SoundBlaster = strings.TrimSpace(sbEntry.Text)
+		profile.Machine = strings.TrimSpace(machineSelect.Selected)
+		profile.SoundBlaster = strings.TrimSpace(sbSelect.Selected)
 		profile.GUS = gusCheck.Checked
-		profile.Joystick = joystickCheck.Checked
+		profile.JoystickType = strings.TrimSpace(joystickSelect.Selected)
 		profile.XMS = xmsCheck.Checked
 		profile.EMS = emsCheck.Checked
 		profile.UMB = umbCheck.Checked
@@ -95,6 +95,9 @@ func Run() error {
 		}
 		if profile.SoundBlaster == "" {
 			return machine.Profile{}, errors.New("sound blaster type is required")
+		}
+		if profile.JoystickType == "" {
+			return machine.Profile{}, errors.New("joystick type is required")
 		}
 
 		var memoryMB int
@@ -129,12 +132,17 @@ func Run() error {
 		applyProfile(profile)
 	})
 
-	for _, field := range []*widget.Entry{nameEntry, descriptionEntry, cpuCoreEntry, cpuTypeEntry, cyclesEntry, machineEntry, memoryEntry, sbEntry} {
+	for _, field := range []*widget.Entry{nameEntry, descriptionEntry, cyclesEntry, memoryEntry} {
 		field.OnChanged = func(string) {
 			refreshPreview()
 		}
 	}
-	for _, check := range []*widget.Check{gusCheck, joystickCheck, xmsCheck, emsCheck, umbCheck} {
+	for _, selectWidget := range []*widget.Select{cpuCoreSelect, cpuTypeSelect, machineSelect, sbSelect, joystickSelect} {
+		selectWidget.OnChanged = func(string) {
+			refreshPreview()
+		}
+	}
+	for _, check := range []*widget.Check{gusCheck, xmsCheck, emsCheck, umbCheck} {
 		check.OnChanged = func(bool) {
 			refreshPreview()
 		}
@@ -165,12 +173,13 @@ func Run() error {
 		widget.NewFormItem("Preset", presetSelect),
 		widget.NewFormItem("Name", nameEntry),
 		widget.NewFormItem("Description", descriptionEntry),
-		widget.NewFormItem("CPU Core", cpuCoreEntry),
-		widget.NewFormItem("CPU Type", cpuTypeEntry),
+		widget.NewFormItem("CPU Core", cpuCoreSelect),
+		widget.NewFormItem("CPU Type", cpuTypeSelect),
 		widget.NewFormItem("Cycles", cyclesEntry),
-		widget.NewFormItem("Video", machineEntry),
+		widget.NewFormItem("Video", machineSelect),
 		widget.NewFormItem("Memory (MB)", memoryEntry),
-		widget.NewFormItem("Sound", sbEntry),
+		widget.NewFormItem("Sound", sbSelect),
+		widget.NewFormItem("Joystick", joystickSelect),
 	)
 
 	formPanel := container.NewBorder(
@@ -181,7 +190,6 @@ func Run() error {
 		container.NewVBox(
 			form,
 			gusCheck,
-			joystickCheck,
 			xmsCheck,
 			emsCheck,
 			umbCheck,

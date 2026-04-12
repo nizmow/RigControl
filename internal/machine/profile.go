@@ -10,7 +10,7 @@ type Profile struct {
 	MemoryMB     int    `json:"memory_mb"`
 	SoundBlaster string `json:"sound_blaster"`
 	GUS          bool   `json:"gus"`
-	Joystick     bool   `json:"joystick"`
+	JoystickType string `json:"joystick_type"`
 	XMS          bool   `json:"xms"`
 	EMS          bool   `json:"ems"`
 	UMB          bool   `json:"umb"`

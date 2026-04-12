@@ -16,9 +16,9 @@ func Render(profile machine.Profile) string {
 		"memsize": fmt.Sprintf("%d", profile.MemoryMB),
 	})
 	writeSection(&builder, "cpu", map[string]string{
-		"core":    profile.CPUCore,
-		"cputype": profile.CPUType,
-		"cycles":  profile.Cycles,
+		"core":       profile.CPUCore,
+		"cputype":    profile.CPUType,
+		"cpu_cycles": profile.Cycles,
 	})
 	writeSection(&builder, "mixer", map[string]string{
 		"rate":      "44100",
@@ -26,18 +26,18 @@ func Render(profile machine.Profile) string {
 		"prebuffer": "20",
 	})
 	writeSection(&builder, "sblaster", map[string]string{
-		"sbtype": profile.SoundBlaster,
-		"sbbase": "220",
-		"irq":    "7",
-		"dma":    "1",
-		"hdma":   "5",
-		"mixer":  "true",
+		"sbtype":  profile.SoundBlaster,
+		"sbbase":  "220",
+		"irq":     "7",
+		"dma":     "1",
+		"hdma":    "5",
+		"sbmixer": "true",
 	})
 	writeSection(&builder, "gus", map[string]string{
 		"gus": boolValue(profile.GUS),
 	})
 	writeSection(&builder, "joystick", map[string]string{
-		"joysticktype": joystickValue(profile.Joystick),
+		"joysticktype": profile.JoystickType,
 	})
 	writeSection(&builder, "dos", map[string]string{
 		"xms": boolValue(profile.XMS),
@@ -68,11 +68,4 @@ func boolValue(enabled bool) string {
 		return "true"
 	}
 	return "false"
-}
-
-func joystickValue(enabled bool) string {
-	if enabled {
-		return "auto"
-	}
-	return "none"
 }
