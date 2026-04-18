@@ -12,6 +12,7 @@ coverage.out
 
 # Fyne packaging
 /fyne-cross/
+/RigControl.app/
 
 # IDE and editor files
 .idea/

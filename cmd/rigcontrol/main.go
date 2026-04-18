@@ -18,7 +18,7 @@ func main() {
 	flag.Parse()
 
 	store := machine.Store{Path: *machinesConfig}
-	profiles, err := store.LoadProfiles()
+	profiles, err := store.LoadProfilesOrCreate(machine.StarterProfiles())
 	if err != nil {
 		log.Fatal(err)
 	}

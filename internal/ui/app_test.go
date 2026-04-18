@@ -8,22 +8,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func TestNewSummaryPathRowUsesExpectedWidgetShape(t *testing.T) {
-	test.NewApp()
-
-	row := newSummaryPathRow("HDD Image", "/tmp/disks/game.img")
-
-	containerRow := row.(*fyne.Container)
-	prefix, pathValue := findSummaryRowParts(t, containerRow)
-
-	if got := prefix.Text; got != "HDD Image: " {
-		t.Fatalf("prefix.Text = %q, want %q", got, "HDD Image: ")
-	}
-	if got := pathValue.fullText; got != "/tmp/disks/game.img" {
-		t.Fatalf("pathValue.fullText = %q, want %q", got, "/tmp/disks/game.img")
-	}
-}
-
 func TestBuildSummaryObjectsCreatesPathValueRows(t *testing.T) {
 	test.NewApp()
 
@@ -35,14 +19,23 @@ func TestBuildSummaryObjectsCreatesPathValueRows(t *testing.T) {
 	if len(objects) != 2 {
 		t.Fatalf("len(objects) = %d, want 2", len(objects))
 	}
-	if _, ok := objects[0].(*widget.Label); !ok {
-		t.Fatalf("objects[0] = %T, want *widget.Label", objects[0])
+
+	if objects[0].Text != "CPU" {
+		t.Fatalf("objects[0].Text = %q, want %q", objects[0].Text, "CPU")
+	}
+	if _, ok := objects[0].Widget.(*widget.Label); !ok {
+		t.Fatalf("objects[0].Widget = %T, want *widget.Label", objects[0].Widget)
 	}
 
-	row := objects[1].(*fyne.Container)
-	_, pathValue := findSummaryRowParts(t, row)
-	if pathValue == nil {
-		t.Fatal("pathValue = nil, want *pathValueLabel")
+	if objects[1].Text != "HDD Image" {
+		t.Fatalf("objects[1].Text = %q, want %q", objects[1].Text, "HDD Image")
+	}
+	pathValue, ok := objects[1].Widget.(*pathValueLabel)
+	if !ok {
+		t.Fatalf("objects[1].Widget = %T, want *pathValueLabel", objects[1].Widget)
+	}
+	if got := pathValue.fullText; got != "/tmp/disks/game.img" {
+		t.Fatalf("pathValue.fullText = %q, want %q", got, "/tmp/disks/game.img")
 	}
 }
 
@@ -102,25 +95,6 @@ func TestInitialEditorWindowSizeHonorsMinimums(t *testing.T) {
 	if size != want {
 		t.Fatalf("initialEditorWindowSize() = %#v, want %#v", size, want)
 	}
-}
-
-func findSummaryRowParts(t *testing.T, row *fyne.Container) (*widget.Label, *pathValueLabel) {
-	t.Helper()
-
-	var prefix *widget.Label
-	var pathValue *pathValueLabel
-	for _, obj := range row.Objects {
-		switch typed := obj.(type) {
-		case *widget.Label:
-			prefix = typed
-		case *pathValueLabel:
-			pathValue = typed
-		}
-	}
-	if prefix == nil || pathValue == nil {
-		t.Fatalf("unexpected summary row shape: %#v", row.Objects)
-	}
-	return prefix, pathValue
 }
 
 type screenSizeApp struct {

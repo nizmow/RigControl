@@ -10,8 +10,11 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
+	fynetooltip "github.com/dweymouth/fyne-tooltip"
+
 	"rigcontrol/internal/dosbox"
 	"rigcontrol/internal/machine"
+	"rigcontrol/internal/ui/assets"
 )
 
 const (
@@ -22,14 +25,13 @@ const (
 )
 
 type appUI struct {
-	window           fyne.Window
-	saveProfiles     func([]machine.Profile) error
-	profiles         []machine.Profile
-	selectedIndex    int
-	list             *widget.List
-	nameLabel        *widget.Label
-	descriptionLabel *widget.Label
-	summaryBox       *fyne.Container
+	window        fyne.Window
+	saveProfiles  func([]machine.Profile) error
+	profiles      []machine.Profile
+	selectedIndex int
+	list          *widget.List
+	machineCard   *widget.Card
+	summaryForm   *widget.Form
 }
 
 func RunWithProfiles(profiles []machine.Profile, saveProfiles func([]machine.Profile) error) error {
@@ -38,11 +40,12 @@ func RunWithProfiles(profiles []machine.Profile, saveProfiles func([]machine.Pro
 	}
 
 	fyneApp := app.NewWithID("com.nizmow.rigcontrol")
+	fyneApp.SetIcon(assets.ResourceAppiconPng)
 	window := fyneApp.NewWindow("RigControl")
 	window.Resize(initialMainWindowSize(fyneApp))
 
 	ui := newAppUI(window, profiles, saveProfiles)
-	window.SetContent(ui.content())
+	window.SetContent(fynetooltip.AddWindowToolTipLayer(ui.content(), window.Canvas()))
 	ui.list.Select(0)
 	window.ShowAndRun()
 
@@ -51,17 +54,14 @@ func RunWithProfiles(profiles []machine.Profile, saveProfiles func([]machine.Pro
 
 func newAppUI(window fyne.Window, profiles []machine.Profile, saveProfiles func([]machine.Profile) error) *appUI {
 	ui := &appUI{
-		window:           window,
-		saveProfiles:     saveProfiles,
-		profiles:         profiles,
-		selectedIndex:    0,
-		nameLabel:        widget.NewLabel(""),
-		descriptionLabel: widget.NewLabel(""),
-		summaryBox:       container.NewVBox(),
+		window:        window,
+		saveProfiles:  saveProfiles,
+		profiles:      profiles,
+		selectedIndex: 0,
+		summaryForm:   widget.NewForm(),
 	}
 
-	ui.nameLabel.TextStyle = fyne.TextStyle{Bold: true}
-	ui.descriptionLabel.Wrapping = fyne.TextWrapWord
+	ui.machineCard = widget.NewCard("", "", ui.summaryForm)
 
 	ui.list = widget.NewList(
 		func() int { return len(ui.profiles) },
@@ -172,21 +172,15 @@ func (ui *appUI) buildRightPane(objects ...fyne.CanvasObject) fyne.CanvasObject 
 }
 
 func (ui *appUI) buildSummaryPane() fyne.CanvasObject {
-	return container.NewVBox(
-		ui.nameLabel,
-		ui.descriptionLabel,
-		widget.NewSeparator(),
-		widget.NewLabel("Configuration Summary"),
-		ui.summaryBox,
-	)
+	return ui.machineCard
 }
 
 func (ui *appUI) refreshSelectedProfile() {
 	profile := ui.selectedProfile()
-	ui.nameLabel.SetText(profile.Name)
-	ui.descriptionLabel.SetText(profile.Description)
-	ui.summaryBox.Objects = buildSummaryObjects(profileSummaryLines(profile))
-	ui.summaryBox.Refresh()
+	ui.machineCard.SetTitle(profile.Name)
+	ui.machineCard.SetSubTitle(profile.Description)
+	ui.summaryForm.Items = buildSummaryObjects(profileSummaryLines(profile))
+	ui.summaryForm.Refresh()
 }
 
 func (ui *appUI) selectProfile(id widget.ListItemID) {
@@ -222,24 +216,18 @@ func (ui *appUI) showConfigPreview() {
 	previewWindow.Show()
 }
 
-func buildSummaryObjects(lines []summaryLine) []fyne.CanvasObject {
-	objects := make([]fyne.CanvasObject, 0, len(lines))
+func buildSummaryObjects(lines []summaryLine) []*widget.FormItem {
+	items := make([]*widget.FormItem, 0, len(lines))
 	for _, line := range lines {
 		if line.IsPath {
-			objects = append(objects, newSummaryPathRow(line.Label, line.Value))
+			items = append(items, widget.NewFormItem(line.Label, newPathValueLabel(line.Value)))
 			continue
 		}
-		label := widget.NewLabel(line.Label + ": " + line.Value)
+		label := widget.NewLabel(line.Value)
 		label.Wrapping = fyne.TextWrapBreak
-		objects = append(objects, label)
+		items = append(items, widget.NewFormItem(line.Label, label))
 	}
-	return objects
-}
-
-func newSummaryPathRow(label, value string) fyne.CanvasObject {
-	prefix := widget.NewLabel(label + ": ")
-	prefix.Wrapping = fyne.TextWrapOff
-	return container.NewBorder(nil, nil, prefix, nil, newPathValueLabel(value))
+	return items
 }
 
 func initialMainWindowSize(app fyne.App) fyne.Size {

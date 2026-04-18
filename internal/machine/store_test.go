@@ -219,3 +219,25 @@ func TestLoadProfilesRejectsEmptyProfilesList(t *testing.T) {
 		t.Fatalf("LoadProfiles() error = %v, want empty profile message", err)
 	}
 }
+
+func TestLoadProfilesOrCreateSeedsMissingConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	store := Store{Path: path}
+	initialProfiles := StarterProfiles()
+
+	got, err := store.LoadProfilesOrCreate(initialProfiles)
+	if err != nil {
+		t.Fatalf("LoadProfilesOrCreate() error = %v", err)
+	}
+	if len(got) != len(initialProfiles) {
+		t.Fatalf("LoadProfilesOrCreate() returned %d profiles, want %d", len(got), len(initialProfiles))
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(content), `"name": "286 EGA"`) {
+		t.Fatalf("saved content missing expected starter profile: %s", string(content))
+	}
+}

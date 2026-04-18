@@ -2,6 +2,7 @@ package machine
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,6 +51,22 @@ func (s Store) LoadProfiles() ([]Profile, error) {
 	}
 
 	return profiles, nil
+}
+
+func (s Store) LoadProfilesOrCreate(initialProfiles []Profile) ([]Profile, error) {
+	profiles, err := s.LoadProfiles()
+	if err == nil {
+		return profiles, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	if err := s.SaveProfiles(initialProfiles); err != nil {
+		return nil, err
+	}
+
+	return validatedProfiles(initialProfiles)
 }
 
 func (s Store) SaveProfiles(profiles []Profile) error {

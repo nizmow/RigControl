@@ -28,3 +28,12 @@ depends = ["format", "test"]
 [tasks.tidy]
 description = "Sync Go module dependencies"
 run = "go mod tidy"
+
+[tasks.bundle]
+description = "Bundle UI assets into Go source"
+run = "cd internal/ui/assets && go run fyne.io/tools/cmd/fyne@latest bundle --prefix Resource -package assets -o bundle.go app_icon.png"
+
+[tasks.package-macos]
+description = "Package RigControl as a macOS .app bundle"
+depends = ["bundle"]
+run = "MACOSX_DEPLOYMENT_TARGET=11.0 go run fyne.io/tools/cmd/fyne@latest package --os darwin --icon $(pwd)/internal/ui/assets/app_icon.png --app-id com.nizmow.rigcontrol --name RigControl --src ./cmd/rigcontrol"
